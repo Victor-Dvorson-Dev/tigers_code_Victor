@@ -1,0 +1,18 @@
+{
+	"extension": {
+		"version": "0.7.2025041600",
+		"json": 2
+	},
+	"project": {
+		"name": "tigers_teleop_26-27",
+		"description": "",
+		"creationDate": "Mon, 29 Jun 2026 20:30:00 EST",
+		"platform": "V5",
+		"language": "python",
+		"slot": 3,
+		"sdkVersion": "V5_1_0_1_25",
+		"python": {
+			"main": "src/clawFunctions.py"
+		}
+	}
+}
