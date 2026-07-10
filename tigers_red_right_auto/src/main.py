@@ -1,11 +1,25 @@
 # ------------------------------------------
 # 
 # 	Project: Victors Tigers Auto 5.0.0
-#	Author: Victor
-#	Created:
-#	Configuration:
+#	Author: Victor Dvorson
 # 
 # ------------------------------------------
+
+"""
+TO DO:
+--------------------------------
+Create loop for moving forward.
+Create position tracking loop.
+Add tracking wheels as sensors for movement?
+
+--------------------------------
+
+Commit Log:
+--------------------------------
+Finished loop to turn robot with pid loop. 7/10/2026
+
+--------------------------------
+"""
 
 # Library imports
 import time
@@ -193,6 +207,11 @@ def moveTo(x, y, endAngle, direction):
         directionBool = False
     else:
         directionBool = True
+
+    
+    #P and D components for PID loop tunring
+    pTurningComponent = 1
+    dTurningComponent = 1
         
     #First PID loop to turn the robot to the position
     #Condition checked at the end
@@ -200,6 +219,8 @@ def moveTo(x, y, endAngle, direction):
 
         #Defines the angle as a heading in degrees
         robotAngle = inertial_1.heading(DEGREES)
+        #Defines the angle change rate as a rate in degrees per second
+        robotAngleChangeRate = inertial_1.gyro_rate(AxisType.XAXIS, VelocityUnits.DPS)
 
         #Raw straight line target angle to point
         targetAngle = calculateTargetAngle(x,y,directionBool)
@@ -207,8 +228,9 @@ def moveTo(x, y, endAngle, direction):
         #Gets modifed target angle, explaied in detail above the method.
         MTD = getMTD(targetAngle, endAngle, robotAngle)
 
-        leftSpeedRaw = MTD-robotAngle
-        rightSpeedRaw = -1*(MTD-robotAngle)
+        leftSpeedRaw = pTurningComponent*(MTD-robotAngle) #Proportional component
+        leftSpeedRaw =  dTurningComponent*robotAngleChangeRate  #Derivative component
+        rightSpeedRaw = -leftSpeedRaw
 
         linearizedSpeeds = linearize(leftSpeedRaw, rightSpeedRaw)
         drivetrain(linearizedSpeeds[0], linearizedSpeeds[1])
