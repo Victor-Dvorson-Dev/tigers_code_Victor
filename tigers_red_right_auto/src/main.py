@@ -9,14 +9,15 @@
 TO DO:
 --------------------------------
 Create loop for moving forward.
-Create position tracking loop.
-Add tracking wheels as sensors for movement?
+Change tracking wheels port  to the real port instead of placeholder.
+Rename tracking wheel to something else
 
 --------------------------------
 
 Commit Log:
 --------------------------------
 Finished loop to turn robot with pid loop. 7/10/2026
+Created position tracking loop. 7/10/2026
 
 --------------------------------
 """
@@ -24,7 +25,7 @@ Finished loop to turn robot with pid loop. 7/10/2026
 # Library imports
 import time
 from vex import *
-import math
+import math as m
 
 # Brain should be defined by default
 brain=Brain()
@@ -35,7 +36,11 @@ motor_BL = Motor(Ports.PORT3, GearSetting.RATIO_6_1, False)
 motor_FR = Motor(Ports.PORT4, GearSetting.RATIO_6_1, True)
 motor_BR = Motor(Ports.PORT6, GearSetting.RATIO_6_1, True)
 inertial_1 = Inertial(Ports.PORT7)
-rotation_B = Rotation(Ports.PORT8, False)
+rotation_FB = Rotation(Ports.PORT8, False)
+
+#x and y position of the robot in inches
+x = 0
+y = 0
 
 
 # wait for rotation sensor to fully initialize
@@ -68,12 +73,23 @@ def drivetrain(leftSpeed, rightSpeed):
 """
 This is a threaded function
 """
-def position(startingX, startingY,startingAngle):
+def position(startingX, startingY,startingAngle, trackingwheelDiamiter):
+    global x
+    global y
+
     x = startingX
     y = startingY
     angle = startingAngle
+
+    previousTrackingAngle = 0
+    rotation_FB.set_position(0, DEGREES)
+
     while True:
-        pass
+
+        x += m.sin(m.radians(angle))*(rotation_FB.angle()-previousTrackingAngle)
+        y += m.cos(m.radians(angle))*(rotation_FB.angle()-previousTrackingAngle)
+
+        previousTrackingAngle = rotation_FB.angle()
 
 
 
