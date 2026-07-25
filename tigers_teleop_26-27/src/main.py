@@ -350,16 +350,8 @@ def elevation():
         else:
             elevationL.stop()
             elevationR.stop()
-            
 
-        
-
-        degreePos = position * 540
-
-
-        while (brain.timer.time(MSEC) - prevTime < 20):
-            wait(1, MSEC)
-
+        wait(20, MSEC)
 
     
 """     
