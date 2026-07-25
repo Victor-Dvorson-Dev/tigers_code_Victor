@@ -8,13 +8,20 @@ brain=Brain()
 
 # Robot configuration code
 controller_1 = Controller(PRIMARY)
-motor_FL = Motor(Ports.PORT2, GearSetting.RATIO_6_1, False)
-motor_BR = Motor(Ports.PORT10, GearSetting.RATIO_6_1, True)
-motor_FR = Motor(Ports.PORT9, GearSetting.RATIO_6_1, True)
-motor_BL = Motor(Ports.PORT1, GearSetting.RATIO_6_1, False)
+
+motorFL = Motor(Ports.PORT10, GearSetting.RATIO_6_1, True)   # front-left
+motorFR = Motor(Ports.PORT1, GearSetting.RATIO_6_1, False)  # front-right
+motorBL = Motor(Ports.PORT9, GearSetting.RATIO_6_1, True)   # back-left
+motorBR = Motor(Ports.PORT3,  GearSetting.RATIO_6_1, False)  # back-right
+motorML = Motor(Ports.PORT8, GearSetting.RATIO_6_1, True)   # mid-left
+motorMR = Motor(Ports.PORT2,  GearSetting.RATIO_6_1, False)  # mid-right
+
+elevationL = Motor(Ports.PORT5, GearSetting.RATIO_6_1, True)
+elevationR = Motor(Ports.PORT6, GearSetting.RATIO_6_1, False)
+
 digital_out_a = DigitalOut(brain.three_wire_port.a)
 digital_out_b = DigitalOut(brain.three_wire_port.b)
-inertial_21 = Inertial(Ports.PORT21)
+inertial_21 = Inertial(Ports.PORT7)
 
 
 # wait for rotation sensor to fully initialize
@@ -146,7 +153,10 @@ def scoring():
                 clawToggle = True
         elif clawToggle == True:
             clawToggle = False
-            
+
+        #prevents the loop from taking up all the brains resources.
+        wait(20, MSEC)
+
 
 def driveFunction():     #Threaded function to drive motors based on controller input
 
@@ -292,59 +302,55 @@ def changeCurveExp(a,b):
     
 def setSpeed(leftV,rightV):
 
-    #sets the velocities of all the motors to the correct amount
-    motor_FL.set_velocity(leftV, PERCENT)
-    motor_FR.set_velocity(rightV, PERCENT)
-    motor_BL.set_velocity(leftV, PERCENT)
-    motor_BR.set_velocity(rightV, PERCENT)
+    #spins all the motors at the correct speed. negative values spin the motor in reverse,
+    #so the signs calculated in driveFunction carry through unchanged.
+    motorFL.spin(FORWARD, leftV, PERCENT)
+    motorML.spin(FORWARD, leftV, PERCENT)
+    motorBL.spin(FORWARD, leftV, PERCENT)
+    motorFR.spin(FORWARD, rightV, PERCENT)
+    motorMR.spin(FORWARD, rightV, PERCENT)
+    motorBR.spin(FORWARD, rightV, PERCENT)
 
 def setTorque(leftT,rightT):
-    motor_FL.set_max_torque(leftT, PERCENT)
-    motor_FR.set_max_torque(rightT, PERCENT)
-    motor_BL.set_max_torque(leftT, PERCENT)
-    motor_BR.set_max_torque(rightT, PERCENT)
+    motorFL.set_max_torque(leftT, PERCENT)
+    motorFR.set_max_torque(rightT, PERCENT)
+    motorML.set_max_torque(leftT, PERCENT)
+    motorMR.set_max_torque(rightT, PERCENT)
+    motorBL.set_max_torque(leftT, PERCENT)
+    motorBR.set_max_torque(rightT, PERCENT)
 
-"""
-def intake():
 
-    motor_10.set_velocity(100, PERCENT)
-    motor_11.set_velocity(100, PERCENT)
+def elevation():
 
-    while(True):
-        if controller_1.buttonR1.pressing():
-            motor_10.spin(FORWARD)
-            motor_11.spin(FORWARD)
-            digital_out_d.set(False)
-            motor_10.set_velocity(100, PERCENT)
-            motor_11.set_velocity(100, PERCENT)
+    position = 0
+    elevationL.set_position(0, DEGREES)
+    elevationR.set_position(0, DEGREES)
+   
+
+    while True:
+        prevTime = brain.timer.time(MSEC)
+
+        if (controller_1.buttonL1.pressing() and position < 1):
+            position += 0.01
+
+        if (controller_1.buttonL2.pressing() and position > 0):
+            position -= 0.01
+
         
-        elif controller_1.buttonA.pressing():
-            motor_10.spin(FORWARD)
-            motor_11.spin(FORWARD)
-            digital_out_d.set(True)
-            motor_10.set_velocity(60, PERCENT)
-            motor_11.set_velocity(100, PERCENT)
 
-        elif controller_1.buttonL1.pressing():
-            motor_10.stop()
-            motor_11.spin(FORWARD)
-            digital_out_d.set(False)
-            motor_10.set_velocity(100, PERCENT)
-            motor_11.set_velocity(100, PERCENT)
+        degreePos = position * 540
 
-        elif controller_1.buttonL2.pressing():
-            motor_10.spin(REVERSE)
-            motor_11.spin(REVERSE)
-            digital_out_d.set(False)
-            motor_10.set_velocity(-100, PERCENT)
-            motor_11.set_velocity(-80, PERCENT)
+        elevationL.spin(FORWARD, degreePos-elevationL.position(DEGREES), DEGREES)
+        elevationR.spin(FORWARD, degreePos-elevationR.position(DEGREES), DEGREES)
 
-        else:
-            motor_10.stop()
-            motor_11.stop()
-"""       
+        while (brain.timer.time(MSEC) - prevTime < 20):
+            wait(1, MSEC)
+
+
+    
+"""     
 def tipPrevention():
-    """print(inertial_13.acceleration(AxisType.YAXIS))
+    print(inertial_13.acceleration(AxisType.YAXIS))
     
     #positive bound for acceleration before it throttles the torque
     if inertial_13.acceleration(AxisType.YAXIS) > 0.3:
@@ -379,15 +385,15 @@ def tipPrevention():
         motor_BR.set_max_torque(100, PERCENT)
         motor_ML.set_max_torque(100, PERCENT)
         motor_MR.set_max_torque(100, PERCENT)  
+"""
 
-    """
 
 
 
 def CIO():
 
-    #prints the temeprature of the warmest motor 
-    controller_1.screen.print(max(motor_FL.temperature(PERCENT),motor_FR.temperature(PERCENT),motor_BL.temperature(PERCENT),motor_BR.temperature(PERCENT)))    
+    #prints the temeprature of the warmest motor
+    controller_1.screen.print(max(motorFL.temperature(PERCENT),motorFR.temperature(PERCENT),motorML.temperature(PERCENT),motorMR.temperature(PERCENT),motorBL.temperature(PERCENT),motorBR.temperature(PERCENT)))
 
 
 
@@ -396,11 +402,7 @@ def pre_autonomous():
     brain.screen.clear_screen()
     brain.screen.print("pre auton code")
     wait(1, SECONDS)
-    motor_FL.spin(FORWARD)
-    motor_FR.spin(FORWARD)
-    motor_BL.spin(FORWARD)
-    motor_BR.spin(FORWARD)
-    
+
 
 def autonomous():
     brain.screen.clear_screen()
@@ -411,9 +413,11 @@ def user_control():
     brain.screen.clear_screen()
     # place driver control in this while loop
     
-    thread = Thread(driveFunction)
-    #thread = Thread(arm_descore)
-    #thread = Thread(intake)
+    driveThread = Thread(driveFunction)
+    scoringThread = Thread(scoring)
+    elevationThread = Thread(elevation)
+    #armThread = Thread(arm_descore)
+    #intakeThread = Thread(intake)
 
     while True:
         
