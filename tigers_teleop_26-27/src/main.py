@@ -290,7 +290,8 @@ def driveFunction():     #Threaded function to drive motors based on controller 
         #prevents the loop from taking up all the brains resources.
         wait(15, MSEC)
 
-"""
+
+""" Unused functions to chenge the curve constants.
 def changeCurveLin(a,b):
     a -= 1
     b += 1
@@ -299,7 +300,8 @@ def changeCurveExp(a,b):
     a += 1
     b -= 1
 """
-    
+
+#sets the speed of the drivetrain motors based on the left and right velocity.
 def setSpeed(leftV,rightV):
 
     #spins all the motors at the correct speed. negative values spin the motor in reverse,
@@ -342,8 +344,8 @@ def elevation():
         elif (controller_1.buttonL2.pressing()):
             elevationL.spin(FORWARD)
             elevationR.spin(FORWARD)
-            elevationL.set_velocity(-20, PERCENT)
-            elevationR.set_velocity(-20, PERCENT)
+            elevationL.set_velocity(-30, PERCENT)
+            elevationR.set_velocity(-30, PERCENT)
 
         else:
             elevationL.stop()
