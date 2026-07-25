@@ -218,7 +218,10 @@ direction: Direction the robot should travel in
     String value either stating "forward" or "reverse"
 
 """
-def moveTo(x, y, endAngle, direction):
+def moveTo(targX, targY, endAngle, direction):
+    global x
+    global y
+
     if direction == "reverse":
         directionBool = False
     else:
@@ -228,6 +231,10 @@ def moveTo(x, y, endAngle, direction):
     #P and D components for PID loop tunring
     pTurningComponent = 1
     dTurningComponent = 1
+
+    #P and D components for PID loop moving forward
+    pMoveComponent = 1
+    dMoveComponent = 1
         
     #First PID loop to turn the robot to the position
     #Condition checked at the end
@@ -239,7 +246,7 @@ def moveTo(x, y, endAngle, direction):
         robotAngleChangeRate = inertial_1.gyro_rate(AxisType.XAXIS, VelocityUnits.DPS)
 
         #Raw straight line target angle to point
-        targetAngle = calculateTargetAngle(x,y,directionBool)
+        targetAngle = calculateTargetAngle(targX,targY,directionBool)
 
         #Gets modifed target angle, explaied in detail above the method.
         MTD = getMTD(targetAngle, endAngle, robotAngle)
@@ -250,7 +257,31 @@ def moveTo(x, y, endAngle, direction):
 
         linearizedSpeeds = linearize(leftSpeedRaw, rightSpeedRaw)
         drivetrain(linearizedSpeeds[0], linearizedSpeeds[1])
-        
+
+        if robotAngle <= targetAngle+0.5 or robotAngle >= targetAngle-0.5:
+            break
+
+    while True:
+        #Defines the angle as a heading in degrees
+        robotAngle = inertial_1.heading(DEGREES)
+        #Defines the angle change rate as a rate in degrees per second
+        robotAngleChangeRate = inertial_1.gyro_rate(AxisType.XAXIS, VelocityUnits.DPS)
+
+        #Raw straight line target angle to point
+        targetAngle = calculateTargetAngle(targX,targY,directionBool)
+
+        #Gets modifed target angle, explaied in detail above the method.
+        MTD = getMTD(targetAngle, endAngle, robotAngle)
+
+        #distance left to travel in inches
+        distanceLeft = m.sqrt(pow(targX-x,2)+pow(targY-y,2)) #do some geometry to work this out in a curved path later!
+
+        leftSpeedRaw = pMoveComponent*(distanceLeft) #Proportional component
+        leftSpeedRaw =  dMoveComponent #Derivative component
+        rightSpeedRaw = leftSpeedRaw
+
+        linearizedSpeeds = linearize(leftSpeedRaw, rightSpeedRaw)
+        drivetrain(linearizedSpeeds[0], linearizedSpeeds[1])
 
 def pre_autonomous():
     # actions to do when the program starts
