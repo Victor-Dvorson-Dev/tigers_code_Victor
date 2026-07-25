@@ -68,8 +68,8 @@ from vex import *
 #VARIABLES
 
 #The drivetrain will turn at this % velocity until changed by pressing x
-startingTurnVelocity = 50 #default is 40
-otherTurnVelocity = 65
+startingTurnVelocity = 30 #default is 40
+otherTurnVelocity = 45
 
 a = 8 #quadratic
 b = 90 #linear
@@ -192,8 +192,8 @@ def driveFunction():     #Threaded function to drive motors based on controller 
         #if statement to allow changes to turn velocity while driving robot
 
         if (controller_1.buttonX.pressing() and toggle2 == False):
-            if (slow == True):
-                slow = False
+            if (slow == False):
+                slow = True
                 turnVelocity = startingTurnVelocity
 
                 #Telemetry for drivers
@@ -203,8 +203,8 @@ def driveFunction():     #Threaded function to drive motors based on controller 
                 print("turn velocity " + str(startingTurnVelocity))
 
 
-            elif (slow == False):
-                slow = True
+            elif (slow == True):
+                slow = False
                     
                 turnVelocity = otherTurnVelocity
 
@@ -325,23 +325,35 @@ def elevation():
     position = 0
     elevationL.set_position(0, DEGREES)
     elevationR.set_position(0, DEGREES)
-   
 
+    elevationL.set_stopping(HOLD)
+    elevationR.set_stopping(HOLD)
+    
     while True:
         prevTime = brain.timer.time(MSEC)
 
-        if (controller_1.buttonL1.pressing() and position < 1):
-            position += 0.01
+        if (controller_1.buttonL1.pressing()):
+            elevationL.spin(FORWARD)
+            elevationR.spin(FORWARD)
+            elevationL.set_velocity(60, PERCENT)
+            elevationR.set_velocity(60, PERCENT)
+            print(elevationL.position(DEGREES))
 
-        if (controller_1.buttonL2.pressing() and position > 0):
-            position -= 0.01
+        elif (controller_1.buttonL2.pressing()):
+            elevationL.spin(FORWARD)
+            elevationR.spin(FORWARD)
+            elevationL.set_velocity(-20, PERCENT)
+            elevationR.set_velocity(-20, PERCENT)
+
+        else:
+            elevationL.stop()
+            elevationR.stop()
+            
 
         
 
         degreePos = position * 540
 
-        elevationL.spin(FORWARD, degreePos-elevationL.position(DEGREES), DEGREES)
-        elevationR.spin(FORWARD, degreePos-elevationR.position(DEGREES), DEGREES)
 
         while (brain.timer.time(MSEC) - prevTime < 20):
             wait(1, MSEC)
