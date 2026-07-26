@@ -19,6 +19,8 @@ motorMR = Motor(Ports.PORT2,  GearSetting.RATIO_6_1, False)  # mid-right
 elevationL = Motor(Ports.PORT5, GearSetting.RATIO_6_1, True)
 elevationR = Motor(Ports.PORT6, GearSetting.RATIO_6_1, False)
 
+rotationMotor = Motor(Ports.PORT11,  GearSetting.RATIO_6_1, False)  # mid-right
+
 digital_out_a = DigitalOut(brain.three_wire_port.a)
 digital_out_b = DigitalOut(brain.three_wire_port.b)
 inertial_21 = Inertial(Ports.PORT7)
@@ -68,13 +70,13 @@ from vex import *
 #VARIABLES
 
 #The drivetrain will turn at this % velocity until changed by pressing x
-startingTurnVelocity = 30 #default is 40
-otherTurnVelocity = 45
+startingTurnVelocity = 20 #default is 20
+otherTurnVelocity = 30
 
-a = 8 #quadratic
-b = 90 #linear
+a = 48 #quadratic
+b = 50 #linear
 c = 2 #verticalTranslation
-d = 1 #deadzone
+d = 2 #deadzone
 p = 3 #power
 
 #a fuction that allows drivers to change the constants from controller
@@ -107,56 +109,6 @@ def inputCurve(input, a, b, c, d, p):
 
     return y
 
-"""
-function to flip the claw. Doesnt take any input and optionally returns the position of the claw after flipping it.
-You can also access the position of the claw by using the global variable clawPosition. 0 = starting position, 1 = flipped position
-"""
-clawPosition = 0
-def flip_claw():
-    global clawPosition
-    if digital_out_b.value() == False:
-        digital_out_b.set(True)
-        clawPosition = 1
-    else:
-        digital_out_b.set(False)
-        clawPosition = 0
-
-    #so kawaii :3 <3
-    brain.screen.clear_line(1)
-    brain.screen.set_cursor(1, 1)
-    brain.screen.print("so kawaii :3 <3 "+str(clawPosition))
-
-    return clawPosition
-
-def scoring():
-
-    flipToggle = False
-    clawToggle = False
-
-
-
-    while True:
-        if controller_1.buttonR1.pressing():
-            if not flipToggle:
-                flip_claw()
-                flipToggle = True
-        elif (flipToggle):
-            flipToggle = False
-        
-        #Opens an closes claw
-        if controller_1.buttonR2.pressing():
-            if clawToggle == False:
-                if digital_out_a.value() == False:
-                    digital_out_a.set(True)
-                else:
-                    digital_out_a.set(False)
-                clawToggle = True
-        elif clawToggle == True:
-            clawToggle = False
-
-        #prevents the loop from taking up all the brains resources.
-        wait(20, MSEC)
-
 
 def driveFunction():     #Threaded function to drive motors based on controller input
 
@@ -174,7 +126,7 @@ def driveFunction():     #Threaded function to drive motors based on controller 
 
 
     #changes how much of the turning velocity is kept at high speeds
-    turnSpeedMult = 0.8
+    turnSpeedMult = 1.2
     
     #Creates telemetry loop variable
     telemLoop = 0
@@ -322,7 +274,14 @@ def setTorque(leftT,rightT):
     motorBR.set_max_torque(rightT, PERCENT)
 
 
-def elevation():
+#Include claw position defenition somewhere in code if using this function!
+clawPosition = 0 #0 = starting position, 1 = flipped position
+def elevationAndClaw():
+    global clawPosition
+    rotationMotor.set_stopping(HOLD)
+
+    clawToggle = False
+    flipToggle = False
 
     position = 0
     elevationL.set_position(0, DEGREES)
@@ -332,6 +291,8 @@ def elevation():
     elevationR.set_stopping(HOLD)
     
     while True:
+
+        #Elevation control
         prevTime = brain.timer.time(MSEC)
 
         if (controller_1.buttonL1.pressing()):
@@ -350,6 +311,51 @@ def elevation():
         else:
             elevationL.stop()
             elevationR.stop()
+
+        #Claw rotation control
+        if (controller_1.buttonUp.pressing()):
+            rotationMotor.spin(FORWARD)
+            rotationMotor.set_velocity(50, PERCENT)
+        elif (controller_1.buttonDown.pressing()):
+            rotationMotor.spin(FORWARD)
+            rotationMotor.set_velocity(-30, PERCENT)
+        else:
+            rotationMotor.stop()
+
+        #Claw flipper
+        """
+        flips the claw if r2 pressed.
+        You can access the position of the claw by using the global variable clawPosition. 0 = starting position, 1 = flipped position
+        """
+        if controller_1.buttonR2.pressing():
+            if flipToggle == False:
+                if digital_out_b.value() == False:
+                    digital_out_b.set(True)
+                    clawPosition = 1
+                else:
+                    digital_out_b.set(False)
+                    clawPosition = 0
+
+                flipToggle = True
+
+                #so kawaii :3 <3
+                brain.screen.clear_line(1)
+                brain.screen.set_cursor(1, 1)
+                brain.screen.print("so kawaii :3 <3 "+str(clawPosition))
+
+        elif (flipToggle == True):
+            flipToggle = False
+
+        #claw 
+        if controller_1.buttonR1.pressing():
+            if clawToggle == False:
+                if digital_out_a.value() == False:
+                    digital_out_a.set(True)
+                else:
+                    digital_out_a.set(False)
+                clawToggle = True
+        elif clawToggle == True:
+            clawToggle = False
 
         wait(20, MSEC)
 
@@ -420,8 +426,7 @@ def user_control():
     # place driver control in this while loop
     
     driveThread = Thread(driveFunction)
-    scoringThread = Thread(scoring)
-    elevationThread = Thread(elevation)
+    elevationAndClawThread = Thread(elevationAndClaw)
     #armThread = Thread(arm_descore)
     #intakeThread = Thread(intake)
 
