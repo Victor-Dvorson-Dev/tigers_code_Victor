@@ -9,8 +9,6 @@
 TO DO:
 --------------------------------
 Create loop for moving forward.
-Change tracking wheels port  to the real port instead of placeholder.
-Rename tracking wheel to something else
 
 --------------------------------
 
@@ -18,6 +16,7 @@ Commit Log:
 --------------------------------
 Finished loop to turn robot with pid loop. 7/10/2026
 Created position tracking loop. 7/10/2026
+Change tracking wheels port  to the real port instead of placeholder. 7/26/26
 
 --------------------------------
 """
@@ -31,12 +30,21 @@ import math as m
 brain=Brain()
 
 # Robot configuration code
-motor_FL = Motor(Ports.PORT1, GearSetting.RATIO_6_1, False)
-motor_BL = Motor(Ports.PORT3, GearSetting.RATIO_6_1, False)
-motor_FR = Motor(Ports.PORT4, GearSetting.RATIO_6_1, True)
-motor_BR = Motor(Ports.PORT6, GearSetting.RATIO_6_1, True)
-inertial_1 = Inertial(Ports.PORT7)
-rotation_FB = Rotation(Ports.PORT8, False)
+motorFL = Motor(Ports.PORT10, GearSetting.RATIO_6_1, True)   # front-left
+motorFR = Motor(Ports.PORT1, GearSetting.RATIO_6_1, False)  # front-right
+motorBL = Motor(Ports.PORT9, GearSetting.RATIO_6_1, True)   # back-left
+motorBR = Motor(Ports.PORT3,  GearSetting.RATIO_6_1, False)  # back-right
+motorML = Motor(Ports.PORT8, GearSetting.RATIO_6_1, True)   # mid-left
+motorMR = Motor(Ports.PORT2,  GearSetting.RATIO_6_1, False)  # mid-right
+
+elevationL = Motor(Ports.PORT5, GearSetting.RATIO_6_1, True)
+elevationR = Motor(Ports.PORT6, GearSetting.RATIO_6_1, False)
+
+digital_out_a = DigitalOut(brain.three_wire_port.a)
+digital_out_b = DigitalOut(brain.three_wire_port.b)
+trackingWheelVertL= Rotation(Ports.PORT4)
+inertial_1 = Inertial(Ports.PORT21)
+
 
 #x and y position of the robot in inches
 x = 0
@@ -63,17 +71,18 @@ print("\033[2J")
 from vex import *
 
 # Begin project code
-
 def drivetrain(leftSpeed, rightSpeed):
-    motor_FL.spin(FORWARD, leftSpeed, PERCENT)
-    motor_BL.spin(FORWARD, leftSpeed, PERCENT)
-    motor_FR.spin(FORWARD, rightSpeed, PERCENT)
-    motor_BR.spin(FORWARD, rightSpeed, PERCENT)
+    motorFL.spin(FORWARD, leftSpeed, PERCENT)
+    motorML.spin(FORWARD, leftSpeed, PERCENT)
+    motorBL.spin(FORWARD, leftSpeed, PERCENT)
+    motorFR.spin(FORWARD, rightSpeed, PERCENT)
+    motorMR.spin(FORWARD, rightSpeed, PERCENT)
+    motorBR.spin(FORWARD, rightSpeed, PERCENT)
 
 """
 This is a threaded function
 """
-def position(startingX, startingY,startingAngle, trackingwheelDiamiter):
+def position(startingX, startingY, startingAngle, trackingwheelDiamiter):
     global x
     global y
 
@@ -82,15 +91,16 @@ def position(startingX, startingY,startingAngle, trackingwheelDiamiter):
     angle = startingAngle
 
     previousTrackingAngle = 0
-    rotation_FB.set_position(0, DEGREES)
+    trackingWheelVertL.set_position(0, DEGREES)
 
     while True:
 
-        x += m.sin(m.radians(angle))*(rotation_FB.angle()-previousTrackingAngle)
-        y += m.cos(m.radians(angle))*(rotation_FB.angle()-previousTrackingAngle)
+        x += m.sin(m.radians(angle))*(trackingWheelVertL.angle()-previousTrackingAngle)/360*trackingwheelDiamiter*m.pi
+        y += m.cos(m.radians(angle))*(trackingWheelVertL.angle()-previousTrackingAngle)/360*trackingwheelDiamiter*m.pi
 
-        previousTrackingAngle = rotation_FB.angle()
+        previousTrackingAngle = trackingWheelVertL.angle()
 
+        wait(10, MSEC)
 
 
 
@@ -104,18 +114,26 @@ directionBool: a boolean version of direction, only taking two inputs, True (for
 
 Returns a floating point angle in degrees
 """
-def calculateTargetAngle(x , y, directionBool):
+def calculateTargetAngle(targX, targY, directionBool):
+    global x
+    global y
 
-    #If direction is not forward, take a point in the exact oppisite direction by negating both x and y
+    #Vector from where the robot actually is to the target
+    deltaX = targX - x
+    deltaY = targY - y
+
+    #If direction is not forward, take a point in the exact oppisite direction by negating the vector.
+    #This must happen AFTER subtracting the robot position -- negating targX/targY first only gives
+    #the same answer when the robot sits at the origin.
     if directionBool == False:
-        x *= -1
-        y *= -1
+        deltaX *= -1
+        deltaY *= -1
 
     #Uses atan2 to find the angle
     #Note: atan2 uses inputs, (y,x) but since our initial direction (angle = 0) is the y axis, we must use (x,y)
-    targetAngle = math.atan2(x,y)
+    targetAngle = m.atan2(deltaX,deltaY)
     #Converts to degrees
-    targetAngle = 360*targetAngle/(math.pi*2)
+    targetAngle = 360*targetAngle/(m.pi*2)
     return targetAngle
 
 """
@@ -173,8 +191,8 @@ Returns a two digit tuple of the left and right motor speeds, linearized, as per
 
 a = 8 #quadratic
 b = 90 #linear
-c = 2 #verticalTranslation
-d = 1 #deadzone
+c = 0.8 #verticalTranslation
+d = 0.5 #deadzone
 p = 3 #power
 
 def linearize(leftMS, rightMS):
@@ -187,6 +205,7 @@ def linearize(leftMS, rightMS):
 
 #Uses inputCurveRaw but takes into account a deadzone.
 def inputCurve(input, a, b, c, d, p):
+    input /= 100
 
     if(input >= d/100):
         #Modified input
@@ -199,7 +218,7 @@ def inputCurve(input, a, b, c, d, p):
     else:
         y = 0
 
-    return y
+    return y*100
 
 #Linearization function that doesnt account for deadzone
 def inputCurveRaw(input, a, b, p):
@@ -229,8 +248,12 @@ def moveTo(targX, targY, endAngle, direction):
 
     
     #P and D components for PID loop tunring
-    pTurningComponent = 1
-    dTurningComponent = 1
+    pTurningComponent = 4
+    #"lookahead time" in seconds -- the controller aims at where the robot will be 0.1s from now.
+    dTurningComponent = 0.1 #time in seconds that it looks ahead
+
+    #How close to MTD (in degrees) counts as done. Recomended to stay wider than inverse of p component.
+    turnExitWindow = 0.5
 
     #P and D components for PID loop moving forward
     pMoveComponent = 1
@@ -238,29 +261,41 @@ def moveTo(targX, targY, endAngle, direction):
         
     #First PID loop to turn the robot to the position
     #Condition checked at the end
+
     while True:
 
         #Defines the angle as a heading in degrees
         robotAngle = inertial_1.heading(DEGREES)
         #Defines the angle change rate as a rate in degrees per second
-        robotAngleChangeRate = inertial_1.gyro_rate(AxisType.XAXIS, VelocityUnits.DPS)
+        robotAngleChangeRate = inertial_1.gyro_rate(AxisType.ZAXIS, VelocityUnits.DPS)
 
         #Raw straight line target angle to point
         targetAngle = calculateTargetAngle(targX,targY,directionBool)
 
         #Gets modifed target angle, explaied in detail above the method.
         MTD = getMTD(targetAngle, endAngle, robotAngle)
+        print("MTD: ", MTD)
 
         leftSpeedRaw = pTurningComponent*(MTD-robotAngle) #Proportional component
-        leftSpeedRaw =  dTurningComponent*robotAngleChangeRate  #Derivative component
+        #Subtracted, not added: the error is (MTD - robotAngle), so its rate of change is
+        #-robotAngleChangeRate. Adding it feeds rotation back positively and fights the P component.
+        leftSpeedRaw -= pTurningComponent*dTurningComponent*robotAngleChangeRate  #Derivative component
         rightSpeedRaw = -leftSpeedRaw
 
         linearizedSpeeds = linearize(leftSpeedRaw, rightSpeedRaw)
         drivetrain(linearizedSpeeds[0], linearizedSpeeds[1])
+        print("speeds: ", linearizedSpeeds[0], linearizedSpeeds[1])
 
-        if robotAngle <= targetAngle+0.5 or robotAngle >= targetAngle-0.5:
+        if robotAngle <= MTD+turnExitWindow and robotAngle >= MTD-turnExitWindow:
+            print("Done Turning")
             break
 
+        wait(10, MSEC)
+            
+
+    drivetrain(0,0)
+
+    """
     while True:
         #Defines the angle as a heading in degrees
         robotAngle = inertial_1.heading(DEGREES)
@@ -282,7 +317,7 @@ def moveTo(targX, targY, endAngle, direction):
 
         linearizedSpeeds = linearize(leftSpeedRaw, rightSpeedRaw)
         drivetrain(linearizedSpeeds[0], linearizedSpeeds[1])
-
+        """
 def pre_autonomous():
     # actions to do when the program starts
     brain.screen.clear_screen()
@@ -293,6 +328,8 @@ def autonomous():
     brain.screen.clear_screen()
     brain.screen.print("autonomous code")
     # hi
+    threadPosition = Thread(position, (0, 0, 0, 2.75))
+    moveTo(10, 10, 45, "forward")
 
 def user_control():
     brain.screen.clear_screen()
