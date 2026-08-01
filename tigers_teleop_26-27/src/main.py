@@ -295,18 +295,18 @@ def elevationAndClaw():
         #Elevation control
         prevTime = brain.timer.time(MSEC)
 
-        if (controller_1.buttonL1.pressing()):
+        if (controller_1.buttonR1.pressing()):
             elevationL.spin(FORWARD)
             elevationR.spin(FORWARD)
-            elevationL.set_velocity(60, PERCENT)
-            elevationR.set_velocity(60, PERCENT)
+            elevationL.set_velocity(100, PERCENT)
+            elevationR.set_velocity(100, PERCENT)
             print(elevationL.position(DEGREES))
 
-        elif (controller_1.buttonL2.pressing()):
+        elif (controller_1.buttonR2.pressing()):
             elevationL.spin(FORWARD)
             elevationR.spin(FORWARD)
-            elevationL.set_velocity(-30, PERCENT)
-            elevationR.set_velocity(-30, PERCENT)
+            elevationL.set_velocity(-60, PERCENT)
+            elevationR.set_velocity(-60, PERCENT)
 
         else:
             elevationL.stop()
@@ -315,10 +315,10 @@ def elevationAndClaw():
         #Claw rotation control
         if (controller_1.buttonUp.pressing()):
             rotationMotor.spin(FORWARD)
-            rotationMotor.set_velocity(50, PERCENT)
+            rotationMotor.set_velocity(70, PERCENT)
         elif (controller_1.buttonDown.pressing()):
             rotationMotor.spin(FORWARD)
-            rotationMotor.set_velocity(-30, PERCENT)
+            rotationMotor.set_velocity(-50, PERCENT)
         else:
             rotationMotor.stop()
 
@@ -327,7 +327,7 @@ def elevationAndClaw():
         flips the claw if r2 pressed.
         You can access the position of the claw by using the global variable clawPosition. 0 = starting position, 1 = flipped position
         """
-        if controller_1.buttonR2.pressing():
+        if controller_1.buttonL2.pressing():
             if flipToggle == False:
                 if digital_out_b.value() == False:
                     digital_out_b.set(True)
@@ -347,7 +347,7 @@ def elevationAndClaw():
             flipToggle = False
 
         #claw 
-        if controller_1.buttonR1.pressing():
+        if controller_1.buttonL1.pressing():
             if clawToggle == False:
                 if digital_out_a.value() == False:
                     digital_out_a.set(True)
