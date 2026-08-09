@@ -399,12 +399,7 @@ def moveTo(targX, targY, endAngle, direction):
 
         arcDistance = convertToArcDistance(linearDistance, MTD, endAngle)
 
-        #convertToArcDistance only ever returns a magnitude, so the move term has to be signed here
-        #or the robot can never back up. Two things flip it:
-        # - "reverse" aims the BACK of the robot at the target, so it has to drive backwards.
-        # - once the target sits more than 90 degrees off the driving end we have driven past it.
-        #(The 90 degree test assumes the arc is at most a half circle, which the wrap in
-        # convertToArcDistance guarantees.)
+       
         if abs(moveAngleWithinRange(0, targetAngle-robotAngle)) > 90:
             arcDistance = -arcDistance
         if directionBool == False:
@@ -415,9 +410,7 @@ def moveTo(targX, targY, endAngle, direction):
 
         moveSpeed = pMoveComponent*arcDistance #Proportional component moving
         if previousArcDistance != None:
-            #arcDistance IS the error, so its own rate of change gets ADDED (it is negative while
-            #closing on the target, which is what damps the approach). Note this spikes if the sign
-            #flip above trips, so keep dMoveComponent small.
+            #arc distance is just the dintance to target but accounting for the curved path.
             moveSpeed += pMoveComponent*dMoveComponent*(arcDistance-previousArcDistance)/(loopPeriod/1000)  #Derivative component moving
         previousArcDistance = arcDistance
 
