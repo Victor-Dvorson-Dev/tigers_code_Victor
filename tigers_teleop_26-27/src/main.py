@@ -70,11 +70,11 @@ from vex import *
 #VARIABLES
 
 #The drivetrain will turn at this % velocity until changed by pressing x
-startingTurnVelocity = 20 #default is 20
-otherTurnVelocity = 30
+startingTurnVelocity = 30 #default is 20
+otherTurnVelocity = 40
 
-a = 48 #quadratic
-b = 50 #linear
+a = 38 #quadratic
+b = 60 #linear
 c = 2 #verticalTranslation
 d = 2 #deadzone
 p = 3 #power
@@ -298,15 +298,15 @@ def elevationAndClaw():
         if (controller_1.buttonR1.pressing()):
             elevationL.spin(FORWARD)
             elevationR.spin(FORWARD)
-            elevationL.set_velocity(100, PERCENT)
-            elevationR.set_velocity(100, PERCENT)
+            elevationL.set_velocity(90, PERCENT)
+            elevationR.set_velocity(90, PERCENT)
             print(elevationL.position(DEGREES))
 
         elif (controller_1.buttonR2.pressing()):
             elevationL.spin(FORWARD)
             elevationR.spin(FORWARD)
-            elevationL.set_velocity(-60, PERCENT)
-            elevationR.set_velocity(-60, PERCENT)
+            elevationL.set_velocity(-65, PERCENT)
+            elevationR.set_velocity(-65, PERCENT)
 
         else:
             elevationL.stop()
@@ -315,10 +315,10 @@ def elevationAndClaw():
         #Claw rotation control
         if (controller_1.buttonUp.pressing()):
             rotationMotor.spin(FORWARD)
-            rotationMotor.set_velocity(70, PERCENT)
+            rotationMotor.set_velocity(-18, PERCENT)
         elif (controller_1.buttonDown.pressing()):
             rotationMotor.spin(FORWARD)
-            rotationMotor.set_velocity(-50, PERCENT)
+            rotationMotor.set_velocity(25, PERCENT)
         else:
             rotationMotor.stop()
 
