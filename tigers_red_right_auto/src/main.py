@@ -49,7 +49,7 @@ elevationR = Motor(Ports.PORT6, GearSetting.RATIO_6_1, False)
 digital_out_a = DigitalOut(brain.three_wire_port.a)
 digital_out_b = DigitalOut(brain.three_wire_port.b)
 trackingWheelVertL= Rotation(Ports.PORT4)
-inertial_1 = Inertial(Ports.PORT21)
+inertial_1 = Inertial(Ports.PORT7)
 
 
 #x and y position of the robot in inches
@@ -301,22 +301,18 @@ def moveTo(targX, targY, endAngle, direction):
 
     
     #P and D components for PID loop tunring
-    pTurningComponent = 4
-    #"lookahead time" in seconds -- the controller aims at where the robot will be 0.1s from now.
-    dTurningComponent = 0.1 #time in seconds that it looks ahead
+    pTurningComponent = 0.45
+
+    dTurningComponent = 0.03 #Dont know why this is so low but it works
 
     #How close to MTD (in degrees) counts as done. Recomended to stay wider than inverse of p component.
-    turnExitWindow = 0.5
+    turnExitWindow = 1.5
 
     #P and D components for PID loop moving forward
-    #pMoveComponent is percent output per inch of remaining arc. Same deadzone trap as the turning
-    #gain (see turnExitWindow): below d/pMoveComponent inches the curve outputs 0%, so the invariant
-    #d/pMoveComponent < moveExitWindow has to hold or the robot parks just outside the window and
-    #never gets another command. At 1 that was 0.5/1 = 0.5, exactly equal -- no margin at all.
     pMoveComponent = 4
     #Same "lookahead time" convention as dTurningComponent. Start at 0 and raise it only if the
     #robot overshoots the point -- odometry is noisy and this differentiates it every 10 msec.
-    dMoveComponent = 0
+    dMoveComponent = 0.10
 
     #How close to the point (in inches) counts as done, and how many passes in a row it has to hold
     #that before the loop believes it -- a 0.5 inch window is easy to cross between two samples.
@@ -332,9 +328,12 @@ def moveTo(targX, targY, endAngle, direction):
     #Period of both loops. Also the timestep the derivative components are measured over.
     loopPeriod = 10 #msec
 
+    telemetryCount = 0
 
     #First PID loop to turn the robot to the position
     #Condition checked at the end
+
+    timeStart = brain.timer.time(MSEC)
 
     while True:
 
@@ -348,23 +347,31 @@ def moveTo(targX, targY, endAngle, direction):
 
         #Gets modifed target angle, explaied in detail above the method.
         MTD = getMTD(targetAngle, endAngle, robotAngle)
-        print("MTD: ", MTD)
 
         leftSpeedRaw = pTurningComponent*(MTD-robotAngle) #Proportional component
         leftSpeedRaw -= pTurningComponent*dTurningComponent*robotAngleChangeRate  #Derivative component
+
+        if MTD-robotAngle > 0:
+            if leftSpeedRaw < 1:
+                leftSpeedRaw = 1
+        else:
+            if leftSpeedRaw > -1:
+                leftSpeedRaw = -1
+
         rightSpeedRaw = -leftSpeedRaw
 
         linearizedSpeeds = linearize(leftSpeedRaw, rightSpeedRaw)
         drivetrain(linearizedSpeeds[0], linearizedSpeeds[1])
-        print("speeds: ", linearizedSpeeds[0], linearizedSpeeds[1])
+        if telemetryCount % 10 == 0:
+            print("speed ", round(linearizedSpeeds[0],1), "left to turn:", round(MTD-robotAngle,1), "p component:", round(pTurningComponent*(MTD-robotAngle),1), "d component:", round(-pTurningComponent*dTurningComponent*robotAngleChangeRate,1))
 
         if robotAngle <= MTD+turnExitWindow and robotAngle >= MTD-turnExitWindow:
-            print("Done Turning")
+            print("Done Turning Time elapsed: ", brain.timer.time(MSEC)-timeStart)
             break
 
         wait(loopPeriod, MSEC)
             
-
+        telemetryCount += 1
     drivetrain(0,0)
 
     
@@ -375,6 +382,7 @@ def moveTo(targX, targY, endAngle, direction):
     settleCounter = 0
     previousArcDistance = None
     moveStartTime = brain.timer.time(MSEC)
+    
 
     while True:
 
@@ -400,19 +408,20 @@ def moveTo(targX, targY, endAngle, direction):
         arcDistance = convertToArcDistance(linearDistance, MTD, endAngle)
 
        
-        if abs(moveAngleWithinRange(0, targetAngle-robotAngle)) > 90:
-            arcDistance = -arcDistance
+        
         if directionBool == False:
             arcDistance = -arcDistance
 
         turnSpeed = pTurningComponent*(MTD-robotAngle) #Proportional component turning
         turnSpeed -= pTurningComponent*dTurningComponent*robotAngleChangeRate  #Derivative component turning
 
-        moveSpeed = pMoveComponent*arcDistance #Proportional component moving
+        moveSpeed = pMoveComponent*linearDistance #Proportional component moving
+        """
         if previousArcDistance != None:
             #arc distance is just the dintance to target but accounting for the curved path.
             moveSpeed += pMoveComponent*dMoveComponent*(arcDistance-previousArcDistance)/(loopPeriod/1000)  #Derivative component moving
         previousArcDistance = arcDistance
+        """
 
         #Turning gets priority over moving. If the two terms together ask for more than 100% the
         #motors clip in firmware and the differential -- the part that actually steers -- is what
@@ -445,6 +454,7 @@ def moveTo(targX, targY, endAngle, direction):
         wait(loopPeriod, MSEC)
 
     drivetrain(0,0)
+    
 
 def pre_autonomous():
     # actions to do when the program starts
@@ -454,8 +464,7 @@ def pre_autonomous():
     #odometry thread. Do not move the robot while this runs.
     brain.screen.print("calibrating - hold still")
 
-    #An unplugged sensor reports "not calibrating" straight away, so the wait below would fall
-    #through and leave heading() pinned at 0 -- which looks exactly like a tuning problem.
+   
     if not inertial_1.installed():
         brain.screen.next_row()
         brain.screen.print("INERTIAL NOT FOUND")
@@ -478,6 +487,13 @@ def pre_autonomous():
     brain.screen.clear_screen()
     brain.screen.print("pre auton code")
 
+    motorFL.set_stopping(HOLD)
+    motorFR.set_stopping(HOLD)
+    motorBL.set_stopping(HOLD)
+    motorBR.set_stopping(HOLD)
+    motorML.set_stopping(HOLD)
+    motorMR.set_stopping(HOLD)
+
     #Short settle so the gyro rate reads zero before anything starts steering off it.
     wait(200, MSEC)
 
@@ -486,7 +502,12 @@ def autonomous():
     brain.screen.print("autonomous code")
     # hi
     threadPosition = Thread(position, (0, 0, 0, 2.75))
-    moveTo(10, 10, 45, "forward")
+    moveTo(10, 0, 90, "forward")
+    wait(1000, MSEC)
+    print(inertial_1.heading(DEGREES))
+    
+    
+    
 
 def user_control():
     brain.screen.clear_screen()
@@ -497,3 +518,4 @@ def user_control():
 # create competition instance
 comp = Competition(user_control, autonomous)
 pre_autonomous()
+autonomous()
