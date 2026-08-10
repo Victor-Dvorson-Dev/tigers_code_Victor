@@ -459,11 +459,6 @@ def moveTo(targX, targY, endAngle, direction):
 def pre_autonomous():
     # actions to do when the program starts
     brain.screen.clear_screen()
-
-    #Every heading reading depends on this, and heading now drives BOTH the turn/move loops and the
-    #odometry thread. Do not move the robot while this runs.
-    brain.screen.print("calibrating - hold still")
-
    
     if not inertial_1.installed():
         brain.screen.next_row()
@@ -472,9 +467,7 @@ def pre_autonomous():
 
     inertial_1.calibrate()
 
-    #Bounded wait for the same reason moveTo has a timeout -- never block the program forever on a
-    #sensor. Calibration takes about 2 seconds, so 5 is a generous ceiling.
-    calibrateTimeout = 5000 #msec
+    calibrateTimeout = 4000 #msec
     calibrateStartTime = brain.timer.time(MSEC)
     while inertial_1.is_calibrating():
         if brain.timer.time(MSEC)-calibrateStartTime > calibrateTimeout:
