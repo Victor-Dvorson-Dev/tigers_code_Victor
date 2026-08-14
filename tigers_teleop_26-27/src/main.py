@@ -399,7 +399,18 @@ def tipPrevention():
         motor_MR.set_max_torque(100, PERCENT)  
 """
 
+def MacroClawUp():
+    #Macro to move the claw up to the top position
+    elevationL.spin(FORWARD)
+    elevationR.spin(FORWARD)
+    elevationL.set_velocity(30, PERCENT)
+    elevationR.set_velocity(30, PERCENT)
 
+    while (elevationL.position(DEGREES) < 10):
+        wait(20, MSEC)
+
+    elevationL.stop()
+    elevationR.stop()
 
 
 def CIO():
@@ -431,7 +442,7 @@ def user_control():
     #intakeThread = Thread(intake)
 
     while True:
-        
+        controller_1.buttonLeft.pressed(MacroClawUp)
         wait(20, MSEC)
         
 
