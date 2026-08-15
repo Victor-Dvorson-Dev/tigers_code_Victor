@@ -19,7 +19,7 @@ motorMR = Motor(Ports.PORT2,  GearSetting.RATIO_6_1, False)  # mid-right
 elevationL = Motor(Ports.PORT5, GearSetting.RATIO_6_1, True)
 elevationR = Motor(Ports.PORT6, GearSetting.RATIO_6_1, False)
 
-rotationMotor = Motor(Ports.PORT11,  GearSetting.RATIO_6_1, False)  # mid-right
+rotationMotor = Motor(Ports.PORT11,  GearSetting.RATIO_6_1, False) 
 
 digital_out_a = DigitalOut(brain.three_wire_port.a)
 digital_out_b = DigitalOut(brain.three_wire_port.b)
@@ -414,10 +414,10 @@ def MacroClawUp():
             print("Macro claw up")
             elevationL.spin(FORWARD)
             elevationR.spin(FORWARD)
-            elevationL.set_velocity(60, PERCENT)
-            elevationR.set_velocity(60, PERCENT)
+            elevationL.set_velocity(100, PERCENT)
+            elevationR.set_velocity(100, PERCENT)
 
-            while (elevationL.position(DEGREES) < 40):
+            while (elevationL.position(DEGREES) < 90):
                 wait(20, MSEC)
 
             elevationL.stop()
