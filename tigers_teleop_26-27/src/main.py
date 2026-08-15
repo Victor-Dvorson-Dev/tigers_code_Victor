@@ -289,6 +289,8 @@ def elevationAndClaw():
 
     elevationL.set_stopping(HOLD)
     elevationR.set_stopping(HOLD)
+
+    stop = False
     
     while True:
 
@@ -301,16 +303,19 @@ def elevationAndClaw():
             elevationL.set_velocity(90, PERCENT)
             elevationR.set_velocity(90, PERCENT)
             print(elevationL.position(DEGREES))
+            stop = False
 
         elif (controller_1.buttonR2.pressing()):
             elevationL.spin(FORWARD)
             elevationR.spin(FORWARD)
             elevationL.set_velocity(-65, PERCENT)
             elevationR.set_velocity(-65, PERCENT)
+            stop = False
 
-        else:
+        elif stop == False:
             elevationL.stop()
             elevationR.stop()
+            stop = True
 
         #Claw rotation control
         if (controller_1.buttonUp.pressing()):
@@ -398,20 +403,31 @@ def tipPrevention():
         motor_ML.set_max_torque(100, PERCENT)
         motor_MR.set_max_torque(100, PERCENT)  
 """
-
+"""
+threaded function
+"""
 def MacroClawUp():
     #Macro to move the claw up to the top position
-    elevationL.spin(FORWARD)
-    elevationR.spin(FORWARD)
-    elevationL.set_velocity(30, PERCENT)
-    elevationR.set_velocity(30, PERCENT)
+    toggle = False
+    while (True):
+        if controller_1.buttonLeft.pressing() and toggle == False:
+            print("Macro claw up")
+            elevationL.spin(FORWARD)
+            elevationR.spin(FORWARD)
+            elevationL.set_velocity(60, PERCENT)
+            elevationR.set_velocity(60, PERCENT)
 
-    while (elevationL.position(DEGREES) < 10):
+            while (elevationL.position(DEGREES) < 40):
+                wait(20, MSEC)
+
+            elevationL.stop()
+            elevationR.stop()
+            toggle = True
+        elif (controller_1.buttonLeft.pressing() == False and toggle == True):
+            toggle = False
+
         wait(20, MSEC)
-
-    elevationL.stop()
-    elevationR.stop()
-
+    
 
 def CIO():
 
@@ -425,6 +441,7 @@ def pre_autonomous():
     brain.screen.clear_screen()
     brain.screen.print("pre auton code")
     wait(1, SECONDS)
+    elevationL.set_position(0, DEGREES)
 
 
 def autonomous():
@@ -438,11 +455,11 @@ def user_control():
     
     driveThread = Thread(driveFunction)
     elevationAndClawThread = Thread(elevationAndClaw)
+    macroClawUpThread = Thread(MacroClawUp)
     #armThread = Thread(arm_descore)
     #intakeThread = Thread(intake)
 
     while True:
-        controller_1.buttonLeft.pressed(MacroClawUp)
         wait(20, MSEC)
         
 
