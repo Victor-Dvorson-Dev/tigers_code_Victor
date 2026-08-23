@@ -8,21 +8,13 @@
 """
 TO DO:
 --------------------------------
-Add a timeout and settle counter to the turning loop -- the moving loop already has both.
-Tune pTurningComponent / dTurningComponent / pMoveComponent / dMoveComponent on the real robot.
-Measure the real tracking wheel diameter (2.75 is assumed) and check it against driven distance.
+Test arc moving with MTD and endAngle
+Change linear distance to arc distance in moveTo
 
 --------------------------------
 
 Commit Log:
 --------------------------------
-Finished loop to turn robot with pid loop. 7/10/2026
-Created position tracking loop. 7/10/2026
-Change tracking wheels port  to the real port instead of placeholder. 7/26/26
-Finished loop to move robot along an arc to the point. 8/1/26
-Fixed arc distance conversion, signed the move term so reverse and overshoot work. 8/1/26
-Odometry now reads heading every pass and uses .position() so it stops drifting on turns. 8/1/26
-Calibrate the inertial in pre auton. Confirmed inertial is really on port 21. 8/1/26
 
 --------------------------------
 """
@@ -45,6 +37,8 @@ motorMR = Motor(Ports.PORT2,  GearSetting.RATIO_6_1, False)  # mid-right
 
 elevationL = Motor(Ports.PORT5, GearSetting.RATIO_6_1, True)
 elevationR = Motor(Ports.PORT6, GearSetting.RATIO_6_1, False)
+
+rotationMotor = Motor(Ports.PORT11,  GearSetting.RATIO_6_1, False) 
 
 digital_out_a = DigitalOut(brain.three_wire_port.a)
 digital_out_b = DigitalOut(brain.three_wire_port.b)
@@ -88,7 +82,7 @@ def drivetrain(leftSpeed, rightSpeed):
 """
 This is a threaded function
 """
-def position(startingX, startingY, startingAngle, trackingwheelDiamiter):
+def position(startingX, startingY, trackingwheelDiamiter):
     global x
     global y
 
@@ -105,7 +99,7 @@ def position(startingX, startingY, startingAngle, trackingwheelDiamiter):
         #Heading has to be re-read every pass. Reading it once before the loop projected every inch
         #of travel onto the heading the robot started at, so x/y went wrong the moment it turned.
         #startingAngle stays as an offset for when the field frame is rotated from the sensor frame.
-        angle = startingAngle + inertial_1.heading(DEGREES)
+        angle = inertial_1.heading(DEGREES)
 
         #.position() accumulates. .angle() wraps at 360, which made the delta jump by -+360 once per
         #wheel revolution -- a phantom 8.6 inch step at a 2.75 inch wheel.
@@ -113,12 +107,15 @@ def position(startingX, startingY, startingAngle, trackingwheelDiamiter):
         currentTrackingAngle = trackingWheelVertL.position(DEGREES)
         deltaTrackingAngle = currentTrackingAngle-previousTrackingAngle
 
-        x += m.sin(m.radians(angle))*deltaTrackingAngle/360*trackingwheelDiamiter*m.pi
-        y += m.cos(m.radians(angle))*deltaTrackingAngle/360*trackingwheelDiamiter*m.pi
+        x -= m.sin(m.radians(angle))*deltaTrackingAngle/360*trackingwheelDiamiter*m.pi
+        y -= m.cos(m.radians(angle))*deltaTrackingAngle/360*trackingwheelDiamiter*m.pi
 
         previousTrackingAngle = currentTrackingAngle
+        if (mode == 1):
+            print("x: ", round(x,2), "y: ", round(y,2), "angle: ", round(angle,2))
 
         wait(10, MSEC)
+        
 
 
 
@@ -290,37 +287,36 @@ direction: Direction the robot should travel in
     String value either stating "forward" or "reverse"
 
 """
-def moveTo(targX, targY, endAngle, direction):
+def moveTo(targX, targY, endAngle, direction, dontTurn = False):
     global x
     global y
 
     if direction == "reverse":
         directionBool = False
-    else:
+    elif direction == "forward":
         directionBool = True
+    else:
+        print("Invalid direction inputted into moveTo. Must be 'forward' or 'reverse'.")
+        return
 
     
     #P and D components for PID loop tunring
-    pTurningComponent = 0.45
+    pTurningComponent = 0.6
 
-    dTurningComponent = 0.03 #Dont know why this is so low but it works
+    dTurningComponent = 0.04 #Dont know why this is so low but it works
 
     #How close to MTD (in degrees) counts as done. Recomended to stay wider than inverse of p component.
     turnExitWindow = 1.5
 
     #P and D components for PID loop moving forward
-    pMoveComponent = 4
-    #Same "lookahead time" convention as dTurningComponent. Start at 0 and raise it only if the
-    #robot overshoots the point -- odometry is noisy and this differentiates it every 10 msec.
-    dMoveComponent = 0.10
+    pMoveComponent = 2
+    dMoveComponent = 0.00
 
-    #How close to the point (in inches) counts as done, and how many passes in a row it has to hold
-    #that before the loop believes it -- a 0.5 inch window is easy to cross between two samples.
-    moveExitWindow = 0.5
-    moveSettleCount = 5
+    moveExitWindow = 0.3
+    moveSettleCount = 3
 
     #Inside this radius (inches) stop re-aiming at the point and just hold endAngle.
-    headingLockRadius = 2
+    headingLockRadius = 1
 
     #Backstop so a wrong heading or a stalled odometry thread costs one movement, not the match.
     moveTimeout = 4000 #msec
@@ -334,44 +330,44 @@ def moveTo(targX, targY, endAngle, direction):
     #Condition checked at the end
 
     timeStart = brain.timer.time(MSEC)
+    if dontTurn == False:
+        while True:
 
-    while True:
+            #Defines the angle as a heading in degrees
+            robotAngle = inertial_1.heading(DEGREES)
+            #Defines the angle change rate as a rate in degrees per second
+            robotAngleChangeRate = inertial_1.gyro_rate(AxisType.ZAXIS, VelocityUnits.DPS)
 
-        #Defines the angle as a heading in degrees
-        robotAngle = inertial_1.heading(DEGREES)
-        #Defines the angle change rate as a rate in degrees per second
-        robotAngleChangeRate = inertial_1.gyro_rate(AxisType.ZAXIS, VelocityUnits.DPS)
+            #Raw straight line target angle to point
+            targetAngle = calculateTargetAngle(targX,targY,directionBool)
 
-        #Raw straight line target angle to point
-        targetAngle = calculateTargetAngle(targX,targY,directionBool)
+            #Gets modifed target angle, explaied in detail above the method.
+            MTD = getMTD(targetAngle, endAngle, robotAngle)
 
-        #Gets modifed target angle, explaied in detail above the method.
-        MTD = getMTD(targetAngle, endAngle, robotAngle)
+            leftSpeedRaw = pTurningComponent*(MTD-robotAngle) #Proportional component
+            leftSpeedRaw -= pTurningComponent*dTurningComponent*robotAngleChangeRate  #Derivative component
 
-        leftSpeedRaw = pTurningComponent*(MTD-robotAngle) #Proportional component
-        leftSpeedRaw -= pTurningComponent*dTurningComponent*robotAngleChangeRate  #Derivative component
+            if MTD-robotAngle > 0:
+                if leftSpeedRaw < 1:
+                    leftSpeedRaw = 1
+            else:
+                if leftSpeedRaw > -1:
+                    leftSpeedRaw = -1
 
-        if MTD-robotAngle > 0:
-            if leftSpeedRaw < 1:
-                leftSpeedRaw = 1
-        else:
-            if leftSpeedRaw > -1:
-                leftSpeedRaw = -1
+            rightSpeedRaw = -leftSpeedRaw
 
-        rightSpeedRaw = -leftSpeedRaw
+            linearizedSpeeds = linearize(leftSpeedRaw, rightSpeedRaw)
+            drivetrain(linearizedSpeeds[0], linearizedSpeeds[1])
+            if telemetryCount % 10 == 0:
+                print("speed ", round(linearizedSpeeds[0],1), "left to turn:", round(MTD-robotAngle,1), "p component:", round(pTurningComponent*(MTD-robotAngle),1), "d component:", round(-pTurningComponent*dTurningComponent*robotAngleChangeRate,1))
 
-        linearizedSpeeds = linearize(leftSpeedRaw, rightSpeedRaw)
-        drivetrain(linearizedSpeeds[0], linearizedSpeeds[1])
-        if telemetryCount % 10 == 0:
-            print("speed ", round(linearizedSpeeds[0],1), "left to turn:", round(MTD-robotAngle,1), "p component:", round(pTurningComponent*(MTD-robotAngle),1), "d component:", round(-pTurningComponent*dTurningComponent*robotAngleChangeRate,1))
+            if robotAngle <= MTD+turnExitWindow and robotAngle >= MTD-turnExitWindow:
+                print("Done Turning Time elapsed: ", brain.timer.time(MSEC)-timeStart)
+                break
 
-        if robotAngle <= MTD+turnExitWindow and robotAngle >= MTD-turnExitWindow:
-            print("Done Turning Time elapsed: ", brain.timer.time(MSEC)-timeStart)
-            break
-
-        wait(loopPeriod, MSEC)
-            
-        telemetryCount += 1
+            wait(loopPeriod, MSEC)
+                
+            telemetryCount += 1
     drivetrain(0,0)
 
     
@@ -401,8 +397,6 @@ def moveTo(targX, targY, endAngle, direction):
             #Gets modifed target angle, explaied in detail above the method.
             MTD = getMTD(targetAngle, endAngle, robotAngle)
         else:
-            #This close the vector to the target is nearly zero length, so its atan2 is mostly noise
-            #and MTD (which doubles that error) thrashes. Hold the final heading and close the gap.
             MTD = moveAngleWithinRange(robotAngle, endAngle)
 
         arcDistance = convertToArcDistance(linearDistance, MTD, endAngle)
@@ -411,6 +405,7 @@ def moveTo(targX, targY, endAngle, direction):
         
         if directionBool == False:
             arcDistance = -arcDistance
+            linearDistance = -linearDistance
 
         turnSpeed = pTurningComponent*(MTD-robotAngle) #Proportional component turning
         turnSpeed -= pTurningComponent*dTurningComponent*robotAngleChangeRate  #Derivative component turning
@@ -423,22 +418,20 @@ def moveTo(targX, targY, endAngle, direction):
         previousArcDistance = arcDistance
         """
 
-        #Turning gets priority over moving. If the two terms together ask for more than 100% the
-        #motors clip in firmware and the differential -- the part that actually steers -- is what
-        #gets eaten, so cap the move term to whatever headroom the turn term leaves instead.
         turnSpeed = max(-100, min(100, turnSpeed))
         moveHeadroom = 100-abs(turnSpeed)
         moveSpeed = max(-moveHeadroom, min(moveHeadroom, moveSpeed))
 
-        leftSpeedRaw = turnSpeed+moveSpeed
-        rightSpeedRaw = -turnSpeed+moveSpeed
+        leftSpeedRaw = (moveSpeed/40+0.6)*turnSpeed+moveSpeed
+        rightSpeedRaw = -(moveSpeed/40+0.6)*turnSpeed+moveSpeed
 
         linearizedSpeeds = linearize(leftSpeedRaw, rightSpeedRaw)
         drivetrain(linearizedSpeeds[0], linearizedSpeeds[1])
-        print("MTD: ", MTD, " dist: ", linearDistance, " speeds: ", linearizedSpeeds[0], linearizedSpeeds[1])
+        if telemetryCount % 10 == 0:
+            print("MTD: ", MTD, " dist: ", linearDistance, " speeds: ", linearizedSpeeds[0], linearizedSpeeds[1])
 
         #The window can be crossed between two samples, so require it to hold before believing it.
-        if linearDistance <= moveExitWindow:
+        if abs(linearDistance) <= moveExitWindow:
             settleCounter += 1
         else:
             settleCounter = 0
@@ -452,14 +445,24 @@ def moveTo(targX, targY, endAngle, direction):
             break
 
         wait(loopPeriod, MSEC)
+        telemetryCount += 1
 
     drivetrain(0,0)
-    
+
+def elevationTo(angle):
+    elevationL.spin_to_position(angle, DEGREES, 100, PERCENT, False)
+    elevationR.spin_to_position(angle, DEGREES, 100, PERCENT, False)
+
+def rotateTo(angle):
+    rotationMotor.spin_to_position(angle, DEGREES, 100, PERCENT, False)
+
+
+mode = 0 #1 = calibrating pos
 
 def pre_autonomous():
     # actions to do when the program starts
     brain.screen.clear_screen()
-   
+
     if not inertial_1.installed():
         brain.screen.next_row()
         brain.screen.print("INERTIAL NOT FOUND")
@@ -477,28 +480,71 @@ def pre_autonomous():
             break
         wait(50, MSEC)
 
+    inertial_1.set_heading(23, DEGREES)
+
     brain.screen.clear_screen()
     brain.screen.print("pre auton code")
+    if mode != 1:
+        motorFL.set_stopping(HOLD)
+        motorFR.set_stopping(HOLD)
+        motorBL.set_stopping(HOLD)
+        motorBR.set_stopping(HOLD)
+        motorML.set_stopping(HOLD)
+        motorMR.set_stopping(HOLD)
 
-    motorFL.set_stopping(HOLD)
-    motorFR.set_stopping(HOLD)
-    motorBL.set_stopping(HOLD)
-    motorBR.set_stopping(HOLD)
-    motorML.set_stopping(HOLD)
-    motorMR.set_stopping(HOLD)
+    rotationMotor.set_stopping(HOLD)
+
+    elevationL.set_stopping(HOLD)
+    elevationR.set_stopping(HOLD)
+
+    rotationMotor.set_position(0, DEGREES)
+    elevationL.set_position(0, DEGREES)
+    elevationR.set_position(0, DEGREES)
 
     #Short settle so the gyro rate reads zero before anything starts steering off it.
-    wait(200, MSEC)
+    wait(100, MSEC)
 
 def autonomous():
     brain.screen.clear_screen()
     brain.screen.print("autonomous code")
     # hi
-    threadPosition = Thread(position, (0, 0, 0, 2.75))
-    moveTo(10, 0, 90, "forward")
-    wait(1000, MSEC)
-    print(inertial_1.heading(DEGREES))
-    
+    threadPosition = Thread(position, (0, 0, 2.0))
+
+    if mode != 1:
+
+        drivetrain(-20,40)
+        wait(80, MSEC)
+        drivetrain(-80,-40)
+        wait(400, MSEC)
+        drivetrain(80,80)
+        wait(200, MSEC)
+        drivetrain(-80,-80)
+        wait(400, MSEC)
+        drivetrain(80,80)
+        wait(100, MSEC)
+        print("yoyoyo\n" + str(inertial_1.heading(DEGREES)))
+
+        elevationTo(520)
+        rotateTo(-60)
+        moveTo(-11.8,10.3,-85, "forward", True)
+        elevationTo(270)
+        wait(700, MSEC)
+        digital_out_a.set(True)
+        wait(300, MSEC)
+        drivetrain(-80,-80)
+        wait(300, MSEC)
+        drivetrain(0,0)
+        """
+        moveTo(-2, 5, 20, "forward")
+        rotationMotor.spin_for(FORWARD, 90, DEGREES)
+        wait(1000, MSEC)
+        print(inertial_1.heading(DEGREES))
+
+        moveTo(5, 0.1, 0, "reverse")
+        moveTo(5, 1, 0, "forward", True)
+        moveTo(5, 0.1, 0, "forward", True)
+
+        """
     
     
 
