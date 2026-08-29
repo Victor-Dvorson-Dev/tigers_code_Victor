@@ -309,14 +309,14 @@ def moveTo(targX, targY, endAngle, direction, dontTurn = False):
     turnExitWindow = 1.5
 
     #P and D components for PID loop moving forward
-    pMoveComponent = 2
+    pMoveComponent = 2.1
     dMoveComponent = 0.00
 
-    moveExitWindow = 0.3
+    moveExitWindow = 0.1
     moveSettleCount = 3
 
     #Inside this radius (inches) stop re-aiming at the point and just hold endAngle.
-    headingLockRadius = 1
+    headingLockRadius = 0.5
 
     #Backstop so a wrong heading or a stalled odometry thread costs one movement, not the match.
     moveTimeout = 4000 #msec
@@ -379,7 +379,7 @@ def moveTo(targX, targY, endAngle, direction, dontTurn = False):
     previousArcDistance = None
     moveStartTime = brain.timer.time(MSEC)
     
-
+    
     while True:
 
         #Defines the angle as a heading in degrees
@@ -422,8 +422,8 @@ def moveTo(targX, targY, endAngle, direction, dontTurn = False):
         moveHeadroom = 100-abs(turnSpeed)
         moveSpeed = max(-moveHeadroom, min(moveHeadroom, moveSpeed))
 
-        leftSpeedRaw = (moveSpeed/40+0.6)*turnSpeed+moveSpeed
-        rightSpeedRaw = -(moveSpeed/40+0.6)*turnSpeed+moveSpeed
+        leftSpeedRaw = (moveSpeed/30+0.5)*turnSpeed+moveSpeed
+        rightSpeedRaw = -(moveSpeed/30+0.5)*turnSpeed+moveSpeed
 
         linearizedSpeeds = linearize(leftSpeedRaw, rightSpeedRaw)
         drivetrain(linearizedSpeeds[0], linearizedSpeeds[1])
@@ -431,7 +431,7 @@ def moveTo(targX, targY, endAngle, direction, dontTurn = False):
             print("MTD: ", MTD, " dist: ", linearDistance, " speeds: ", linearizedSpeeds[0], linearizedSpeeds[1])
 
         #The window can be crossed between two samples, so require it to hold before believing it.
-        if abs(linearDistance) <= moveExitWindow:
+        if abs(linearDistance) <= moveExitWindow and robotAngle <= MTD+turnExitWindow and robotAngle >= MTD-turnExitWindow:
             settleCounter += 1
         else:
             settleCounter = 0
@@ -446,7 +446,7 @@ def moveTo(targX, targY, endAngle, direction, dontTurn = False):
 
         wait(loopPeriod, MSEC)
         telemetryCount += 1
-
+        
     drivetrain(0,0)
 
 def elevationTo(angle):
@@ -480,7 +480,8 @@ def pre_autonomous():
             break
         wait(50, MSEC)
 
-    inertial_1.set_heading(23, DEGREES)
+    inertial_1.set_heading(22.8, DEGREES)
+    #inertial_1.set_heading(0, DEGREES)
 
     brain.screen.clear_screen()
     brain.screen.print("pre auton code")
@@ -512,6 +513,12 @@ def autonomous():
 
     if mode != 1:
 
+        """
+        moveTo(24,0,90, "forward")
+        moveTo(0,0,-90, "forward")
+        """
+
+        
         drivetrain(-20,40)
         wait(80, MSEC)
         drivetrain(-80,-40)
@@ -524,16 +531,19 @@ def autonomous():
         wait(100, MSEC)
         print("yoyoyo\n" + str(inertial_1.heading(DEGREES)))
 
-        elevationTo(520)
+        elevationTo(480)
         rotateTo(-60)
-        moveTo(-11.8,10.3,-85, "forward", True)
-        elevationTo(270)
+        moveTo(-11.1,9.65,-85, "forward", True)
+        elevationTo(240)
         wait(700, MSEC)
         digital_out_a.set(True)
         wait(300, MSEC)
-        drivetrain(-80,-80)
-        wait(300, MSEC)
+        drivetrain(-100,-100)
+        wait(250, MSEC)
         drivetrain(0,0)
+        wait(200, MSEC)
+        moveTo(-3,29.5,45, "forward")
+        """
         """
         moveTo(-2, 5, 20, "forward")
         rotationMotor.spin_for(FORWARD, 90, DEGREES)
@@ -544,7 +554,7 @@ def autonomous():
         moveTo(5, 1, 0, "forward", True)
         moveTo(5, 0.1, 0, "forward", True)
 
-        """
+        
     
     
 
