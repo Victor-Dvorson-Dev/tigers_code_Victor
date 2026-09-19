@@ -71,7 +71,7 @@ from vex import *
 
 #The drivetrain will turn at this % velocity until changed by pressing x
 startingTurnVelocity = 30 #default is 20
-otherTurnVelocity = 40
+otherTurnVelocity = 35
 
 a = 38 #quadratic
 b = 60 #linear
@@ -415,7 +415,7 @@ def MacroClawUp():
             elevationL.spin(FORWARD)
             elevationR.spin(FORWARD)
             elevationL.set_velocity(100, PERCENT)
-            elevationR.set_velocity(100, PERCENT)
+            elevationR.set_velocity(90, PERCENT)
 
             while (elevationL.position(DEGREES) < 320):
                 wait(20, MSEC)
