@@ -300,8 +300,8 @@ def elevationAndClaw():
         if (controller_1.buttonR1.pressing()):
             elevationL.spin(FORWARD)
             elevationR.spin(FORWARD)
-            elevationL.set_velocity(90, PERCENT)
-            elevationR.set_velocity(90, PERCENT)
+            elevationL.set_velocity(95, PERCENT)
+            elevationR.set_velocity(85, PERCENT)
             print(elevationL.position(DEGREES))
             stop = False
 
@@ -320,10 +320,10 @@ def elevationAndClaw():
         #Claw rotation control
         if (controller_1.buttonUp.pressing()):
             rotationMotor.spin(FORWARD)
-            rotationMotor.set_velocity(-18, PERCENT)
+            rotationMotor.set_velocity(25, PERCENT)
         elif (controller_1.buttonDown.pressing()):
             rotationMotor.spin(FORWARD)
-            rotationMotor.set_velocity(25, PERCENT)
+            rotationMotor.set_velocity(-18, PERCENT)
         else:
             rotationMotor.stop()
 
@@ -417,7 +417,7 @@ def MacroClawUp():
             elevationL.set_velocity(100, PERCENT)
             elevationR.set_velocity(100, PERCENT)
 
-            while (elevationL.position(DEGREES) < 90):
+            while (elevationL.position(DEGREES) < 320):
                 wait(20, MSEC)
 
             elevationL.stop()
