@@ -480,6 +480,8 @@ def pre_autonomous():
     # actions to do when the program starts
     brain.screen.clear_screen()
 
+    prevInertial = inertial_1.heading(DEGREES)
+
     if not inertial_1.installed():
         brain.screen.next_row()
         brain.screen.print("INERTIAL NOT FOUND")
@@ -498,7 +500,7 @@ def pre_autonomous():
         wait(50, MSEC)
 
     if mode !=1:
-        inertial_1.set_heading(16.7, DEGREES)
+        inertial_1.set_heading(prevInertial, DEGREES)
     else:
         inertial_1.set_heading(0, DEGREES)
 
