@@ -16,8 +16,8 @@ motorBR = Motor(Ports.PORT3,  GearSetting.RATIO_6_1, False)  # back-right
 motorML = Motor(Ports.PORT8, GearSetting.RATIO_6_1, True)   # mid-left
 motorMR = Motor(Ports.PORT2,  GearSetting.RATIO_6_1, False)  # mid-right
 
-elevationL = Motor(Ports.PORT5, GearSetting.RATIO_6_1, True)
-elevationR = Motor(Ports.PORT6, GearSetting.RATIO_6_1, False)
+elevationL = Motor(Ports.PORT4, GearSetting.RATIO_6_1, False)
+elevationR = Motor(Ports.PORT6, GearSetting.RATIO_6_1, True)
 
 rotationMotor = Motor(Ports.PORT11,  GearSetting.RATIO_6_1, False) 
 
@@ -70,8 +70,8 @@ from vex import *
 #VARIABLES
 
 #The drivetrain will turn at this % velocity until changed by pressing x
-startingTurnVelocity = 30 #default is 20
-otherTurnVelocity = 35
+startingTurnVelocity = 40 #default is 
+otherTurnVelocity = 50
 
 a = 38 #quadratic
 b = 60 #linear
@@ -274,14 +274,12 @@ def setTorque(leftT,rightT):
     motorBR.set_max_torque(rightT, PERCENT)
 
 
-#Include claw position defenition somewhere in code if using this function!
-clawPosition = 0 #0 = starting position, 1 = flipped position
+
 def elevationAndClaw():
     global clawPosition
     rotationMotor.set_stopping(HOLD)
 
     clawToggle = False
-    flipToggle = False
 
     position = 0
     elevationL.set_position(0, DEGREES)
@@ -300,56 +298,22 @@ def elevationAndClaw():
         if (controller_1.buttonR1.pressing()):
             elevationL.spin(FORWARD)
             elevationR.spin(FORWARD)
-            elevationL.set_velocity(95, PERCENT)
-            elevationR.set_velocity(85, PERCENT)
+            elevationL.set_velocity(100, PERCENT)
+            elevationR.set_velocity(100, PERCENT)
             print(elevationL.position(DEGREES))
             stop = False
 
         elif (controller_1.buttonR2.pressing()):
             elevationL.spin(FORWARD)
             elevationR.spin(FORWARD)
-            elevationL.set_velocity(-65, PERCENT)
-            elevationR.set_velocity(-65, PERCENT)
+            elevationL.set_velocity(-100, PERCENT)
+            elevationR.set_velocity(-100, PERCENT)
             stop = False
 
         elif stop == False:
             elevationL.stop()
             elevationR.stop()
             stop = True
-
-        #Claw rotation control
-        if (controller_1.buttonUp.pressing()):
-            rotationMotor.spin(FORWARD)
-            rotationMotor.set_velocity(25, PERCENT)
-        elif (controller_1.buttonDown.pressing()):
-            rotationMotor.spin(FORWARD)
-            rotationMotor.set_velocity(-18, PERCENT)
-        else:
-            rotationMotor.stop()
-
-        #Claw flipper
-        """
-        flips the claw if r2 pressed.
-        You can access the position of the claw by using the global variable clawPosition. 0 = starting position, 1 = flipped position
-        """
-        if controller_1.buttonL2.pressing():
-            if flipToggle == False:
-                if digital_out_b.value() == False:
-                    digital_out_b.set(True)
-                    clawPosition = 1
-                else:
-                    digital_out_b.set(False)
-                    clawPosition = 0
-
-                flipToggle = True
-
-                #so kawaii :3 <3
-                brain.screen.clear_line(1)
-                brain.screen.set_cursor(1, 1)
-                brain.screen.print("so kawaii :3 <3 "+str(clawPosition))
-
-        elif (flipToggle == True):
-            flipToggle = False
 
         #claw 
         if controller_1.buttonL1.pressing():
@@ -410,20 +374,20 @@ def MacroClawUp():
     #Macro to move the claw up to the top position
     toggle = False
     while (True):
-        if controller_1.buttonLeft.pressing() and toggle == False:
+        if controller_1.buttonL2.pressing() and toggle == False:
             print("Macro claw up")
             elevationL.spin(FORWARD)
             elevationR.spin(FORWARD)
             elevationL.set_velocity(100, PERCENT)
-            elevationR.set_velocity(90, PERCENT)
+            elevationR.set_velocity(100, PERCENT)
 
-            while (elevationL.position(DEGREES) < 320):
+            while (elevationL.position(DEGREES) < 280):
                 wait(20, MSEC)
 
             elevationL.stop()
             elevationR.stop()
             toggle = True
-        elif (controller_1.buttonLeft.pressing() == False and toggle == True):
+        elif (controller_1.buttonL2.pressing() == False and toggle == True):
             toggle = False
 
         wait(20, MSEC)
