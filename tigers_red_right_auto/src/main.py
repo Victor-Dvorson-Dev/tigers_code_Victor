@@ -35,16 +35,14 @@ motorBR = Motor(Ports.PORT3,  GearSetting.RATIO_6_1, False)  # back-right
 motorML = Motor(Ports.PORT8, GearSetting.RATIO_6_1, True)   # mid-left
 motorMR = Motor(Ports.PORT2,  GearSetting.RATIO_6_1, False)  # mid-right
 
-elevationL = Motor(Ports.PORT5, GearSetting.RATIO_6_1, True)
-elevationR = Motor(Ports.PORT6, GearSetting.RATIO_6_1, False)
-
-rotationMotor = Motor(Ports.PORT11,  GearSetting.RATIO_6_1, False) 
+elevationL = Motor(Ports.PORT4, GearSetting.RATIO_6_1, False)
+elevationR = Motor(Ports.PORT6, GearSetting.RATIO_6_1, True)
 
 digital_out_a = DigitalOut(brain.three_wire_port.a)
-digital_out_b = DigitalOut(brain.three_wire_port.b)
-trackingWheelVertL= Rotation(Ports.PORT4)
+trackingWheelVertL= Rotation(Ports.PORT11, True)
 inertial_1 = Inertial(Ports.PORT7)
 
+controller_1 = Controller(PRIMARY)
 
 #x and y position of the robot in inches
 x = 0
@@ -311,12 +309,12 @@ def moveTo(targX, targY, endAngle, direction, dontTurn = False):
     pMoveComponent = 2.2
     dMoveComponent = 0.00
 
-    #Must stay wider than deadzone/pMoveComponent (0.28in) or the curve zeroes the motors first.
-    moveExitWindow = 0.4
+    #Must stay wider than deadzone/pMoveComponent
+    moveExitWindow = 0.3
     moveSettleCount = 3
 
     #Inside this radius (inches) stop re-aiming at the point and just hold endAngle (ONLY APLIES TO TURNING FUNCTION, DOES NOT APPLY TO ARC LOCKING).
-    headingLockRadius = 0.5
+    headingLockRadius = 0.4
 
     arcLockingRadius = 2
 
@@ -444,7 +442,7 @@ def moveTo(targX, targY, endAngle, direction, dontTurn = False):
         linearizedSpeeds = linearize(leftSpeedRaw, rightSpeedRaw)
         drivetrain(linearizedSpeeds[0], linearizedSpeeds[1])
         if telemetryCount % 10 == 0:
-            print("MTD: ", round(MTD,1), " lag: ", round(MTD-robotAngle,1), " dist: ", round(linearDistance,2), " scales: ", round(leftScale,3), round(rightScale,3), " speeds: ", round(linearizedSpeeds[0],1), round(linearizedSpeeds[1],1))
+            print("MTD: ", round(MTD,1), " reading: ", round(robotAngle,1), " dist: ", round(linearDistance,2), " scales: ", round(leftScale,3), round(rightScale,3), " speeds: ", round(linearizedSpeeds[0],1), round(linearizedSpeeds[1],1))
 
         #Checks to make sure robot is within the exit windows
         if abs(linearDistance) <= moveExitWindow and robotAngle <= MTD+turnExitWindow and robotAngle >= MTD-turnExitWindow:
@@ -470,17 +468,22 @@ def elevationTo(angle):
     elevationL.spin_to_position(angle, DEGREES, 100, PERCENT, False)
     elevationR.spin_to_position(angle, DEGREES, 100, PERCENT, False)
 
-def rotateTo(angle):
-    rotationMotor.spin_to_position(angle, DEGREES, 100, PERCENT, False)
-
-
-mode = 0 #1 = calibrating pos
+mode = 2 #0 = comp mode #1 = calibrating pos #2 = testing pos
 
 def pre_autonomous():
+    global mode
+
     # actions to do when the program starts
     brain.screen.clear_screen()
+    if (comp.is_field_control() or comp.is_competition_switch()):
+        mode = 0
 
+    """
     prevInertial = inertial_1.heading(DEGREES)
+
+    wait(1000, MSEC)
+    prevInertial = inertial_1.heading(DEGREES)
+    """
 
     if not inertial_1.installed():
         brain.screen.next_row()
@@ -499,13 +502,29 @@ def pre_autonomous():
             break
         wait(50, MSEC)
 
-    if mode !=1:
-        inertial_1.set_heading(prevInertial, DEGREES)
-    else:
-        inertial_1.set_heading(0, DEGREES)
+    
+    inertial_1.set_heading(0, DEGREES)
+
 
     brain.screen.clear_screen()
     brain.screen.print("pre auton code")
+
+    elevationL.set_stopping(HOLD)
+    elevationR.set_stopping(HOLD)
+
+    elevationL.set_position(0, DEGREES)
+    elevationR.set_position(0, DEGREES)
+
+    #Short settle so the gyro rate reads zero before anything starts steering off it.
+    wait(200, MSEC)
+
+    controller_1.screen.print("Ready for alignment")
+
+def autonomous():
+    global drivetrainWidth
+    brain.screen.clear_screen()
+    brain.screen.print("autonomous code")
+
     if mode != 1:
         motorFL.set_stopping(HOLD)
         motorFR.set_stopping(HOLD)
@@ -514,25 +533,8 @@ def pre_autonomous():
         motorML.set_stopping(HOLD)
         motorMR.set_stopping(HOLD)
 
-    rotationMotor.set_stopping(HOLD)
-
-    elevationL.set_stopping(HOLD)
-    elevationR.set_stopping(HOLD)
-
-    rotationMotor.set_position(0, DEGREES)
-    elevationL.set_position(0, DEGREES)
-    elevationR.set_position(0, DEGREES)
-
-    #Short settle so the gyro rate reads zero before anything starts steering off it.
-    wait(100, MSEC)
-
-def autonomous():
-    global drivetrainWidth
-    brain.screen.clear_screen()
-    brain.screen.print("autonomous code")
-
     #width of the drivetrain in inches (wheel to wheel)
-    drivetrainWidth = 12.8
+    drivetrainWidth = 12.5
     threadPosition = Thread(position, (0, 0, 2.0))
 
     if mode != 1:
@@ -544,37 +546,36 @@ def autonomous():
         """
         
         
-        rotationMotor.spin(REVERSE, 100, PERCENT)
-        drivetrain(-20,40)
+        
+        drivetrain(-20,60)
         wait(80, MSEC)
-        rotationMotor.stop()
-        rotateTo(-130)
         drivetrain(-80,-40)
-        wait(400, MSEC)
+        wait(250, MSEC)
         drivetrain(80,80)
-        wait(200, MSEC)
+        wait(150, MSEC)
         drivetrain(-80,-80)
-        wait(400, MSEC)
+        wait(300, MSEC)
         drivetrain(80,80)
         wait(100, MSEC)
+        drivetrain(0,0)
 
-        elevationTo(700)
-        moveTo(-10.0,10,-85, "forward", True)
-        elevationTo(250)
+        elevationTo(1200)
+        moveTo(-15.5,11.5,-85, "forward", True)
+        elevationTo(600)
         wait(500, MSEC)
         digital_out_a.set(True)
         wait(200, MSEC)
         drivetrain(-100,-100)
         elevationTo(230)
-        wait(200, MSEC)
+        wait(250, MSEC)
         drivetrain(0,0)
         wait(200, MSEC)
-        moveTo(21,-3.6, 140, "forward")
+        moveTo(19.1,-5.2, 150, "forward")
         digital_out_a.set(False)
-        wait(100, MSEC)
-        elevationTo(1600)
-        moveTo(24,2.5,20, "forward")
-        elevationTo(1000)
+        wait(200, MSEC)
+        elevationTo(2600)
+        moveTo(20,2.7,20, "forward")
+        elevationTo(1500)
         wait(500, MSEC)
         digital_out_a.set(True)
         drivetrain(-100,-100)
@@ -606,4 +607,10 @@ def user_control():
 comp = Competition(user_control, autonomous)
 pre_autonomous()
 #BENCH TESTING ONLY -- remove before a match, Competition above already runs this.
-autonomous()
+if mode == 2:
+    print("Press button A to start autonomous")
+    controller_1.screen.clear_line
+    controller_1.screen.print("Press button A to start autonomous")
+    while (controller_1.buttonA.pressing() == False):
+        wait(20, MSEC)
+    autonomous()
