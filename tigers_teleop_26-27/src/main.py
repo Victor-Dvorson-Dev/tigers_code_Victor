@@ -19,11 +19,11 @@ motorMR = Motor(Ports.PORT2,  GearSetting.RATIO_6_1, False)  # mid-right
 elevationL = Motor(Ports.PORT4, GearSetting.RATIO_6_1, False)
 elevationR = Motor(Ports.PORT6, GearSetting.RATIO_6_1, True)
 
-rotationMotor = Motor(Ports.PORT11,  GearSetting.RATIO_6_1, False) 
-
 digital_out_a = DigitalOut(brain.three_wire_port.a)
 digital_out_b = DigitalOut(brain.three_wire_port.b)
 inertial_21 = Inertial(Ports.PORT7)
+
+distance_claw = Distance(Ports.PORT12)
 
 
 # wait for rotation sensor to fully initialize
@@ -277,7 +277,6 @@ def setTorque(leftT,rightT):
 
 def elevationAndClaw():
     global clawPosition
-    rotationMotor.set_stopping(HOLD)
 
     clawToggle = False
 
@@ -303,11 +302,11 @@ def elevationAndClaw():
             print(elevationL.position(DEGREES))
             stop = False
 
-        elif (controller_1.buttonR2.pressing()):
+        elif (controller_1.buttonR2.pressing() and elevationL.position(DEGREES) > 0):
             elevationL.spin(FORWARD)
             elevationR.spin(FORWARD)
-            elevationL.set_velocity(-100, PERCENT)
-            elevationR.set_velocity(-100, PERCENT)
+            elevationL.set_velocity(-75, PERCENT)
+            elevationR.set_velocity(-75, PERCENT)
             stop = False
 
         elif stop == False:
@@ -375,23 +374,46 @@ def MacroClawUp():
     toggle = False
     while (True):
         if controller_1.buttonL2.pressing() and toggle == False:
-            print("Macro claw up")
-            elevationL.spin(FORWARD)
-            elevationR.spin(FORWARD)
-            elevationL.set_velocity(100, PERCENT)
-            elevationR.set_velocity(100, PERCENT)
-
-            while (elevationL.position(DEGREES) < 280):
-                wait(20, MSEC)
-
-            elevationL.stop()
-            elevationR.stop()
+            MacroClawUpLoop()
             toggle = True
         elif (controller_1.buttonL2.pressing() == False and toggle == True):
             toggle = False
 
         wait(20, MSEC)
+
+def MacroClawUpLoop():
+    print("Macro claw up")
+    elevationL.spin(FORWARD)
+    elevationR.spin(FORWARD)
+    elevationL.set_velocity(100, PERCENT)
+    elevationR.set_velocity(100, PERCENT)
+    while (elevationL.position(DEGREES) < 290):
+        wait(20, MSEC)
+    elevationL.stop()
+    elevationR.stop()
     
+def autoGrab():
+    #Macro to grab the cone
+    toggle = False
+
+    while (True):
+        if controller_1.buttonB.pressing():
+            print("Auto grab paused")
+            while controller_1.buttonB.pressing():
+                wait(20, MSEC)
+            while(controller_1.buttonB.pressing() == False):
+                wait(20, MSEC)
+
+        if distance_claw.object_distance(INCHES) < 4 and elevationL.position(DEGREES) < 280 and toggle == False:
+            digital_out_a.set(False)
+            wait(250, MSEC)
+            MacroClawUpLoop()
+            print("Auto grab complete")
+            toggle = True
+        elif (toggle):
+            toggle = False
+
+        wait(20, MSEC)
 
 def CIO():
 
@@ -420,8 +442,8 @@ def user_control():
     driveThread = Thread(driveFunction)
     elevationAndClawThread = Thread(elevationAndClaw)
     macroClawUpThread = Thread(MacroClawUp)
-    #armThread = Thread(arm_descore)
-    #intakeThread = Thread(intake)
+    #autoGrabThread = Thread(autoGrab)
+    
 
     while True:
         wait(20, MSEC)
