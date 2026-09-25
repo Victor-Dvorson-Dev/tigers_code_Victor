@@ -281,18 +281,21 @@ def elevationAndClaw():
     clawToggle = False
 
     position = 0
-    elevationL.set_position(0, DEGREES)
-    elevationR.set_position(0, DEGREES)
 
     elevationL.set_stopping(HOLD)
     elevationR.set_stopping(HOLD)
 
     stop = False
+
+    disableClawLimit = False
     
     while True:
 
         #Elevation control
         prevTime = brain.timer.time(MSEC)
+
+        if (controller_1.buttonUp.pressing()):
+            disableClawLimit = True
 
         if (controller_1.buttonR1.pressing()):
             elevationL.spin(FORWARD)
@@ -302,7 +305,14 @@ def elevationAndClaw():
             print(elevationL.position(DEGREES))
             stop = False
 
-        elif (controller_1.buttonR2.pressing() and elevationL.position(DEGREES) > 0):
+        elif (controller_1.buttonR2.pressing() and elevationL.position(DEGREES) > 0 and disableClawLimit == False):
+            elevationL.spin(FORWARD)
+            elevationR.spin(FORWARD)
+            elevationL.set_velocity(-75, PERCENT)
+            elevationR.set_velocity(-75, PERCENT)
+            stop = False
+
+        elif (controller_1.buttonR2.pressing() and disableClawLimit == True):
             elevationL.spin(FORWARD)
             elevationR.spin(FORWARD)
             elevationL.set_velocity(-75, PERCENT)
@@ -427,7 +437,8 @@ def pre_autonomous():
     brain.screen.clear_screen()
     brain.screen.print("pre auton code")
     wait(1, SECONDS)
-    elevationL.set_position(0, DEGREES)
+    #elevationL.set_position(0, DEGREES)
+    #elevationR.set_position(0, DEGREES)
 
 
 def autonomous():
