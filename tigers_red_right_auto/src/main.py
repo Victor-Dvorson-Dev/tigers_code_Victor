@@ -8,13 +8,6 @@
 """
 TO DO:
 --------------------------------
-Test arc moving with new system
-make path more realiable
-
---------------------------------
-
-Commit Log:
---------------------------------
 
 --------------------------------
 """
@@ -48,6 +41,9 @@ controller_1 = Controller(PRIMARY)
 x = 0
 y = 0
 
+#velocity of robot in inches per second.
+velocityForward = 0
+
 
 # wait for rotation sensor to fully initialize
 wait(30, MSEC)
@@ -71,6 +67,15 @@ from vex import *
 drivetrainWidth = 0
 
 # Begin project code
+"""
+Function that sets the speed of the drivetrain motors.
+leftSpeed: Number that gets set to the left speed of the drivetrain
+    Floating Point
+rightSpeed: Number that gets set to the right speed of the drivetrain
+    Floating Point
+
+Returns: Nothing
+"""
 def drivetrain(leftSpeed, rightSpeed):
     motorFL.spin(FORWARD, leftSpeed, PERCENT)
     motorML.spin(FORWARD, leftSpeed, PERCENT)
@@ -81,10 +86,14 @@ def drivetrain(leftSpeed, rightSpeed):
 
 """
 This is a threaded function
+Position function that tracks the position of the robot in inches and the velocity of the robot in inches per second.
+Uses the average of  5 measurments for velocity.
+
 """
 def position(startingX, startingY, trackingwheelDiamiter):
     global x
     global y
+    global velocityForward
 
     x = startingX
     y = startingY
@@ -94,7 +103,12 @@ def position(startingX, startingY, trackingwheelDiamiter):
     #with previousTrackingAngle = 0 because the loop below reads .position().
     trackingWheelVertL.set_position(0, DEGREES)
 
+    #The time between velocity measurments, must wait for tracking wheel to update.
+    lastVelocityGetTime = brain.timer.time(MSEC) - 20
+    velocityForwardArr = [0,0,0,0,0]
+
     while True:
+        lastLoopTime = brain.timer.time(MSEC)
 
         angle = inertial_1.heading(DEGREES)
 
@@ -102,14 +116,27 @@ def position(startingX, startingY, trackingwheelDiamiter):
         currentTrackingAngle = trackingWheelVertL.position(DEGREES)
         deltaTrackingAngle = currentTrackingAngle-previousTrackingAngle
 
-        x -= m.sin(m.radians(angle))*deltaTrackingAngle/360*trackingwheelDiamiter*m.pi
-        y -= m.cos(m.radians(angle))*deltaTrackingAngle/360*trackingwheelDiamiter*m.pi
+        trackDist = -deltaTrackingAngle/360*trackingwheelDiamiter*m.pi
+
+        x += m.sin(m.radians(angle))*trackDist
+        y += m.cos(m.radians(angle))*trackDist
 
         previousTrackingAngle = currentTrackingAngle
         if (mode == 1):
             print("x: ", round(x,2), "y: ", round(y,2), "angle: ", round(angle,2))
 
-        wait(10, MSEC)
+        #Velocity averaged over >100 msec
+        #Array of speeds with 5 elements, later averaged to make forwardSpeed.
+        for i in range(len(velocityForwardArr)-1,0,-1):
+            velocityForwardArr[i] = velocityForwardArr[i-1]
+        velocityForwardArr[0] = trackDist/((brain.timer.time(MSEC)-lastVelocityGetTime)/1000)
+        lastVelocityGetTime = brain.timer.time(MSEC)
+
+        #take the average of the array
+        velocityForward = sum(velocityForwardArr)/(len(velocityForwardArr))
+
+        if (brain.timer.time(MSEC)-lastLoopTime < 20):
+            wait(20 - brain.timer.time(MSEC)+lastLoopTime, MSEC)
         
 
 
@@ -225,13 +252,12 @@ def getArcModifiers(arcDistance, MTD, endAngle, width, arcLockRadius = 1):
     leftScale = 1-halfTrack
     rightScale = 1+halfTrack
 
-    #Makes sure maximum modifier is 1.
-    """
+    #Makes sure maximum modifier is 1 This is important because we want the straight line speed of the robot to be faster than when it is turning.
     biggest = max(abs(leftScale), abs(rightScale))
     if biggest > 1:
         leftScale /= biggest
         rightScale /= biggest
-    """
+    
     return (leftScale, rightScale)
 
 
@@ -278,10 +304,20 @@ def inputCurveRaw(input, a, b, p):
     y = (a/100)*pow(input,p) +  (b/100)*input
     return y
 
+def moveToDW(targX, targY, endAngle, direction, dontTurn = False):
+    threadMoveTo = Thread(moveTo, (targX, targY, endAngle, direction, dontTurn))
 
+
+finishedMove = False
 def moveTo(targX, targY, endAngle, direction, dontTurn = False):
     global x
     global y
+    global stopCondition
+    global distanceLeft
+    global finishedMove
+
+    stopCondition = False
+    finishedMove = False
 
     if direction == "reverse":
         directionBool = False
@@ -289,6 +325,7 @@ def moveTo(targX, targY, endAngle, direction, dontTurn = False):
         directionBool = True
     else:
         print("Invalid direction")
+        finishedMove = True
         return
 
     
@@ -306,7 +343,7 @@ def moveTo(targX, targY, endAngle, direction, dontTurn = False):
     turnExitWindow = 1.5
 
     #P and D components for PID loop moving forward
-    pMoveComponent = 2.2
+    pMoveComponent = 3.5
     dMoveComponent = 0.00
 
     #Must stay wider than deadzone/pMoveComponent
@@ -380,8 +417,7 @@ def moveTo(targX, targY, endAngle, direction, dontTurn = False):
     moveStartTime = brain.timer.time(MSEC)
 
     lastMoveSpeed = 0
-    
-    while True:
+    while stopCondition == False:
 
         #Defines the angle as a heading in degrees
         robotAngle = inertial_1.heading(DEGREES)
@@ -404,7 +440,7 @@ def moveTo(targX, targY, endAngle, direction, dontTurn = False):
             #if within a small radius of target uses linear distance intead of arc.
             arcDistance = linearDistance
 
-
+        distanceLeft = arcDistance
        
         
         if directionBool == False:
@@ -463,7 +499,14 @@ def moveTo(targX, targY, endAngle, direction, dontTurn = False):
         telemetryCount += 1
         
     drivetrain(0,0)
+    stopCondition = False
+    finishedMove = True
 
+"""
+Elevates the lift by spinning elevation motors to a centian angle.
+angle: the angle to which the motors should spin to.
+    Floating Point
+"""
 def elevationTo(angle):
     elevationL.spin_to_position(angle, DEGREES, 100, PERCENT, False)
     elevationR.spin_to_position(angle, DEGREES, 100, PERCENT, False)
@@ -522,6 +565,11 @@ def pre_autonomous():
 
 def autonomous():
     global drivetrainWidth
+    global velocityForward
+    global stopCondition
+    global distanceLeft
+    global finishedMove
+
     brain.screen.clear_screen()
     brain.screen.print("autonomous code")
 
@@ -538,15 +586,16 @@ def autonomous():
     threadPosition = Thread(position, (0, 0, 2.0))
 
     if mode != 1:
+        moveToDW(10,10,90, "forward")
+        distanceLeft = 10
+        while((velocityForward > 0 or distanceLeft > 4) and not finishedMove):
+            wait(20, MSEC)
+        stopCondition = True
+        while(stopCondition == True and not finishedMove):
+            wait(20, MSEC)
+        finishedMove = False
         
         """
-        moveTo(0,36,0, "forward")
-        moveTo(24,36,135, "forward")
-        moveTo(0,36,-90, "forward")
-        """
-        
-        
-        
         drivetrain(-20,60)
         wait(80, MSEC)
         drivetrain(-80,-40)
@@ -560,13 +609,13 @@ def autonomous():
         drivetrain(0,0)
 
         elevationTo(1200)
-        moveTo(-15.5,11.5,-85, "forward", True)
+        moveTo(-15.6,11.6,-85, "forward", True)
         elevationTo(600)
         wait(500, MSEC)
         digital_out_a.set(True)
         wait(200, MSEC)
         drivetrain(-100,-100)
-        elevationTo(230)
+        elevationTo(270)
         wait(250, MSEC)
         drivetrain(0,0)
         wait(200, MSEC)
@@ -581,18 +630,16 @@ def autonomous():
         drivetrain(-100,-100)
         wait(100, MSEC)
         drivetrain(0,0)
-         
+        """
         
-        """
-        moveTo(-2, 5, 20, "forward")
-        rotationMotor.spin_for(FORWARD, 90, DEGREES)
-        wait(1000, MSEC)
-        print(inertial_1.heading(DEGREES))
-
-        moveTo(5, 0.1, 0, "reverse")
-        moveTo(5, 1, 0, "forward", True)
-        moveTo(5, 0.1, 0, "forward", True)
-        """
+    if mode == 1:
+            
+        while True:
+            controller_1.screen.set_cursor(1,1)
+            controller_1.screen.clear_line(1)
+            controller_1.screen.print(round(velocityForward,1))
+            print(round(velocityForward,1))
+            wait(100, MSEC)
         
     
     
@@ -606,7 +653,9 @@ def user_control():
 # create competition instance
 comp = Competition(user_control, autonomous)
 pre_autonomous()
-#BENCH TESTING ONLY -- remove before a match, Competition above already runs this.
+if mode == 1:
+    autonomous()
+
 if mode == 2:
     print("Press button A to start autonomous")
     controller_1.screen.clear_line
