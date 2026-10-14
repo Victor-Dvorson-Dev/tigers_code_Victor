@@ -10,10 +10,10 @@ brain=Brain()
 controller_1 = Controller(PRIMARY)
 
 motorFL = Motor(Ports.PORT10, GearSetting.RATIO_6_1, True)   # front-left
-motorFR = Motor(Ports.PORT14, GearSetting.RATIO_6_1, False)  # front-right
-motorBL = Motor(Ports.PORT9, GearSetting.RATIO_6_1, True)   # back-left
+motorFR = Motor(Ports.PORT1, GearSetting.RATIO_6_1, False)  # front-right
+motorBL = Motor(Ports.PORT8, GearSetting.RATIO_6_1, True)   # back-left
 motorBR = Motor(Ports.PORT3,  GearSetting.RATIO_6_1, False)  # back-right
-motorML = Motor(Ports.PORT8, GearSetting.RATIO_6_1, True)   # mid-left
+motorML = Motor(Ports.PORT9, GearSetting.RATIO_6_1, True)   # mid-left
 motorMR = Motor(Ports.PORT2,  GearSetting.RATIO_6_1, False)  # mid-right
 
 elevationL = Motor(Ports.PORT4, GearSetting.RATIO_6_1, False)
