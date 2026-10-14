@@ -10,7 +10,7 @@ brain=Brain()
 controller_1 = Controller(PRIMARY)
 
 motorFL = Motor(Ports.PORT10, GearSetting.RATIO_6_1, True)   # front-left
-motorFR = Motor(Ports.PORT1, GearSetting.RATIO_6_1, False)  # front-right
+motorFR = Motor(Ports.PORT14, GearSetting.RATIO_6_1, False)  # front-right
 motorBL = Motor(Ports.PORT9, GearSetting.RATIO_6_1, True)   # back-left
 motorBR = Motor(Ports.PORT3,  GearSetting.RATIO_6_1, False)  # back-right
 motorML = Motor(Ports.PORT8, GearSetting.RATIO_6_1, True)   # mid-left
@@ -287,7 +287,7 @@ def elevationAndClaw():
 
     stop = False
 
-    disableClawLimit = False
+    disableClawLimit = True
     
     while True:
 
@@ -305,14 +305,7 @@ def elevationAndClaw():
             print(elevationL.position(DEGREES))
             stop = False
 
-        elif (controller_1.buttonR2.pressing() and elevationL.position(DEGREES) > 0 and disableClawLimit == False):
-            elevationL.spin(FORWARD)
-            elevationR.spin(FORWARD)
-            elevationL.set_velocity(-75, PERCENT)
-            elevationR.set_velocity(-75, PERCENT)
-            stop = False
-
-        elif (controller_1.buttonR2.pressing() and disableClawLimit == True):
+        elif (controller_1.buttonR2.pressing()):
             elevationL.spin(FORWARD)
             elevationR.spin(FORWARD)
             elevationL.set_velocity(-75, PERCENT)
