@@ -45,6 +45,10 @@ y = 0
 velocityForward = 0
 
 
+stopCondition = False
+distanceLeft = 0
+
+
 # wait for rotation sensor to fully initialize
 wait(30, MSEC)
 
@@ -105,7 +109,7 @@ def position(startingX, startingY, trackingwheelDiamiter):
 
     #The time between velocity measurments, must wait for tracking wheel to update.
     lastVelocityGetTime = brain.timer.time(MSEC) - 20
-    velocityForwardArr = [0,0,0,0,0]
+    velocityForwardArr = [0,0,0,0]
 
     while True:
         lastLoopTime = brain.timer.time(MSEC)
@@ -125,8 +129,8 @@ def position(startingX, startingY, trackingwheelDiamiter):
         if (mode == 1):
             print("x: ", round(x,2), "y: ", round(y,2), "angle: ", round(angle,2))
 
-        #Velocity averaged over >100 msec
-        #Array of speeds with 5 elements, later averaged to make forwardSpeed.
+        #Velocity averaged over >60 msec
+        #Array of speeds with 3 elements, later averaged to make forwardSpeed.
         for i in range(len(velocityForwardArr)-1,0,-1):
             velocityForwardArr[i] = velocityForwardArr[i-1]
         velocityForwardArr[0] = trackDist/((brain.timer.time(MSEC)-lastVelocityGetTime)/1000)
@@ -173,39 +177,34 @@ def calculateTargetAngle(targX, targY, directionBool):
     targetAngle = 360*targetAngle/(m.pi*2)
     return targetAngle
 
-"""
-A function to move an angle (secondAngle) to within +-180 degrees of the reference angle (referanceAngle)
-This is to ensure that the robot will always take the sortest path to an angle, which can always be achived with <= 180 degree turn
-referanceAngle: float
-secondAngle: float
 
-returns a floating point angle in degrees
-"""
 def moveAngleWithinRange(referanceAngle, secondAngle):
+    """
+    A function to move an angle (secondAngle) to within +-180 degrees of the reference angle (referanceAngle)
+    This is to ensure that the robot will always take the sortest path to an angle, which can always be achived with <= 180 degree turn
+    referanceAngle: float
+    secondAngle: float
 
+    returns a floating point angle in degrees
     """
-    takes the difference between both angles: (second-referance)
-    divides that by 360 and rounds to see if the diference is closest to any multiple of 360 than 0
-    this is done because if the diference is too large, >180 aka closer to a multiple of 360 then
-    there is the same angle but -360 -- not actually changing the angle -- which is closer to the referance angle.
-    multiplies by 360 to get it back into an angle again
-    subtracts from second angle to get it to the closest value to the referance angle
-    """
+
     return secondAngle-360*round((secondAngle-referanceAngle)/360)
 
 
 
-"""
-Gets the MTD which is a modified target angle that accounts for the ending angle inputted into this function.
 
-Then it moves it to within 180 degrees of the robotAngle to ensure distance traveled is minimum.
-
-targetAngle: Floating point angle in degrees
-robotAngle: Floating point angle in degrees
-
-returns a floating point angle in degrees
-"""
 def getMTD(targetAngle, endAngle, robotAngle):
+    """
+    Gets the MTD which is a modified target angle that accounts for the ending angle inputted into this function.
+
+    Then it moves it to within 180 degrees of the robotAngle to ensure distance traveled is minimum.
+
+    targetAngle: Floating point angle in degrees
+    robotAngle: Floating point angle in degrees
+
+    returns a floating point angle in degrees
+    """
+
     #calculates MTD
     MTD = 2*targetAngle-endAngle
 
@@ -215,12 +214,14 @@ def getMTD(targetAngle, endAngle, robotAngle):
     return MTD
 
 
-"""
-Converts the straight line distance to the target into the distance the robot 
-will take if it travels in an arc.
-Returns float of distance in inches.
-"""
+
 def convertToArcDistance(linearDistance, MTD, endAngle):
+    """
+    Converts the straight line distance to the target into the distance the robot 
+    will take if it travels in an arc.
+    Returns float of distance in inches.
+    """
+
     arcAngle = moveAngleWithinRange(0, MTD-endAngle)
 
     #Straight shot. Also guards the 0/0 in the formula below (whose limit is exactly linearDistance).
@@ -231,17 +232,19 @@ def convertToArcDistance(linearDistance, MTD, endAngle):
     return linearDistance*m.radians(arcAngle)/(2*m.sin(m.radians(arcAngle/2)))
 
 
-"""
-Speed scale for each side so each side covers the distance its own wheel travels on the arc.
 
-arcDistance: signed arc length to the target in inches, negative for reverse
-MTD: modified target direction in degrees
-endAngle: heading the robot should finish at in degrees
-width: drivetrain track width in inches, wheel to wheel
-
-returns (leftScale, rightScale)
-"""
 def getArcModifiers(arcDistance, MTD, endAngle, width, arcLockRadius = 1):
+    """
+    Speed scale for each side so each side covers the distance its own wheel travels on the arc.
+
+    arcDistance: signed arc length to the target in inches, negative for reverse
+    MTD: modified target direction in degrees
+    endAngle: heading the robot should finish at in degrees
+    width: drivetrain track width in inches, wheel to wheel
+
+    returns (leftScale, rightScale)
+    """
+
     if arcDistance < arcLockRadius:
         return (1,1)
     #makes math a little simpler
@@ -261,12 +264,6 @@ def getArcModifiers(arcDistance, MTD, endAngle, width, arcLockRadius = 1):
     return (leftScale, rightScale)
 
 
-"""
-A function to linearize the motor speeds so an input of 50% will actually be 50% of the max speed, not 50% of the max voltage which is what the motors actually take in.
-leftMS: the left , unlinearized, motor speed as a percentage from -100 to 100
-rightMS: the right, unlinearized, motor speed as a percentage from -100 to 100
-Returns a two digit tuple of the left and right motor speeds, linearized, as percentages from -100 to 100
-"""
 
 a = 0#quadratic
 b = 99.2 #linear
@@ -275,6 +272,13 @@ d = 0.4 #deadzone
 p = 1#power
 
 def linearize(leftMS, rightMS):
+    """
+    A function to linearize the motor speeds so an input of 50% will actually be 50% of the max speed, not 50% of the max voltage which is what the motors actually take in.
+    leftMS: the left , unlinearized, motor speed as a percentage from -100 to 100
+    rightMS: the right, unlinearized, motor speed as a percentage from -100 to 100
+    Returns a two digit tuple of the left and right motor speeds, linearized, as percentages from -100 to 100
+    """
+
     global a,b,c,d,p   
     leftMS = inputCurve(leftMS, a,b,c,d,p)
     rightMS = inputCurve(rightMS, a,b,c,d,p)
@@ -304,20 +308,18 @@ def inputCurveRaw(input, a, b, p):
     y = (a/100)*pow(input,p) +  (b/100)*input
     return y
 
-def moveToDW(targX, targY, endAngle, direction, dontTurn = False):
-    threadMoveTo = Thread(moveTo, (targX, targY, endAngle, direction, dontTurn))
+def moveToDW(targX, targY, endAngle, direction, moveSpeedMult = 1.0, dontTurn = False):
+    threadMoveTo = Thread(moveTo, (targX, targY, endAngle, direction, moveSpeedMult, dontTurn))
 
 
-finishedMove = False
-def moveTo(targX, targY, endAngle, direction, dontTurn = False):
+def moveTo(targX, targY, endAngle, direction, moveSpeedMult = 1.0, dontTurn = False):
     global x
     global y
     global stopCondition
     global distanceLeft
-    global finishedMove
+    global velocityForward
 
     stopCondition = False
-    finishedMove = False
 
     if direction == "reverse":
         directionBool = False
@@ -325,17 +327,19 @@ def moveTo(targX, targY, endAngle, direction, dontTurn = False):
         directionBool = True
     else:
         print("Invalid direction")
-        finishedMove = True
+        stopCondition = True
+        wait(200, MSEC)
+        stopCondition = False
         return
 
     
     #P and D components for PID loop tunring
-    pTurningComponent = 0.6
+    pTurningComponent = 0.5
 
     dTurningComponent = 0.05 #Dont know why this is so low but it works
 
     #P and D components for DRIVING loop tunring
-    pDriveTurningComponent = 0.4
+    pDriveTurningComponent = 0.5
 
     dDriveTurningComponent = 0
 
@@ -343,20 +347,20 @@ def moveTo(targX, targY, endAngle, direction, dontTurn = False):
     turnExitWindow = 1.5
 
     #P and D components for PID loop moving forward
-    pMoveComponent = 3.5
-    dMoveComponent = 0.00
+    pMoveComponent = 2.5*moveSpeedMult
+    dMoveComponent = 0.1*moveSpeedMult
 
     #Must stay wider than deadzone/pMoveComponent
     moveExitWindow = 0.3
     moveSettleCount = 3
 
     #Inside this radius (inches) stop re-aiming at the point and just hold endAngle (ONLY APLIES TO TURNING FUNCTION, DOES NOT APPLY TO ARC LOCKING).
-    headingLockRadius = 0.4
+    headingLockRadius = 1
 
     arcLockingRadius = 2
 
     #timeout
-    moveTimeout = 4000 #msec
+    moveTimeout = 5000 #msec
 
     #Period of both loops and time between telemetry points.
     loopPeriod = 10 #msec
@@ -447,7 +451,7 @@ def moveTo(targX, targY, endAngle, direction, dontTurn = False):
             arcDistance = -arcDistance
             linearDistance = -linearDistance
 
-        #Straight moves return (1,1).  important: fix this bug later!
+        #Straight moves return (1,1).  important: fix this bug later! ??
         arcScales = getArcModifiers(arcDistance, robotAngle, endAngle, drivetrainWidth, arcLockingRadius)
         leftScale = arcScales[0]
         rightScale = arcScales[1]
@@ -456,6 +460,8 @@ def moveTo(targX, targY, endAngle, direction, dontTurn = False):
         turnSpeed -= pDriveTurningComponent*dDriveTurningComponent*robotAngleChangeRate  #Derivative component turning
 
         moveSpeed = pMoveComponent*linearDistance #Proportional component moving
+
+        moveSpeed -= dMoveComponent*velocityForward  #Derivative component moving
         """
         if previousArcDistance != None:
             #arc distance is just the dintance to target but accounting for the curved path.
@@ -464,11 +470,11 @@ def moveTo(targX, targY, endAngle, direction, dontTurn = False):
         """
 
         turnSpeed = max(-100, min(100, turnSpeed))
-        moveHeadroom = 100-abs(turnSpeed)
-        moveSpeed = max(-moveHeadroom, min(moveHeadroom, moveSpeed))
+        #moveHeadroom = 100-abs(turnSpeed) Maybe unneeded?
+        #moveSpeed = max(-moveHeadroom, min(moveHeadroom, moveSpeed))
 
-        if moveSpeed > lastMoveSpeed+1/max(arcScales):
-            moveSpeed = lastMoveSpeed+1/max(arcScales)
+        if moveSpeed > lastMoveSpeed+2:
+            moveSpeed = lastMoveSpeed+2
         lastMoveSpeed = moveSpeed
 
         #The scales carry the arc, so turnSpeed only corrects the leftover heading error.
@@ -491,6 +497,12 @@ def moveTo(targX, targY, endAngle, direction, dontTurn = False):
             print("Done Moving")
             break
 
+        #DOESNT WORK FOR REVERS
+        if linearDistance <= headingLockRadius and abs(targetAngle -endAngle) > 135:
+            print("OVERSHOOT")
+            print(str(x) + ", " + str(y) + ", d:" + str(linearDistance))
+            break
+
         if brain.timer.time(MSEC)-moveStartTime > moveTimeout:
             print("Move timed out")
             break
@@ -499,8 +511,209 @@ def moveTo(targX, targY, endAngle, direction, dontTurn = False):
         telemetryCount += 1
         
     drivetrain(0,0)
+    stopCondition = True
+    wait(200, MSEC)
     stopCondition = False
-    finishedMove = True
+
+
+def moveToLinDW(targX, targY, direction, moveSpeedMult = 1.0, dontTurn = False):
+    threadMoveTo = Thread(moveToLin, (targX, targY, direction, moveSpeedMult, dontTurn))
+
+def moveToLin(targX, targY, direction, moveSpeedMult = 1.0, dontTurn = False):
+    global x
+    global y
+    global stopCondition
+    global distanceLeft
+    global velocityForward
+
+    stopCondition = False
+
+    if direction == "reverse":
+        directionBool = False
+    elif direction == "forward":
+        directionBool = True
+    else:
+        print("Invalid direction")
+        stopCondition = True
+        wait(200, MSEC)
+        stopCondition = False
+        return
+
+    
+    #P and D components for PID loop tunring
+    pTurningComponent = 0.5
+
+    dTurningComponent = 0.05 #Dont know why this is so low but it works
+
+    #P and D components for DRIVING loop tunring
+    pDriveTurningComponent = 0.5
+
+    dDriveTurningComponent = 0
+
+    #How close to MTD (in degrees) counts as done. Recomended to stay wider than inverse of p component.
+    turnExitWindow = 1.5
+
+    #P and D components for PID loop moving forward
+    pMoveComponent = 2.5*moveSpeedMult
+    dMoveComponent = 0.1*moveSpeedMult
+
+    #Must stay wider than deadzone/pMoveComponent
+    moveExitWindow = 0.3
+    moveSettleCount = 3
+
+    #Inside this radius (inches) stop re-aiming at the point and just holds current angle.
+    headingLockRadius = 1
+
+    #timeout
+    moveTimeout = 5000 #msec
+
+    #Period of both loops and time between telemetry points.
+    loopPeriod = 10 #msec
+
+    telemetryCount = 0
+
+    #turning loop
+
+    timeStart = brain.timer.time(MSEC)
+    if dontTurn == False:
+        while True:
+
+            #Defines the angle as a heading in degrees
+            robotAngle = inertial_1.heading(DEGREES)
+            #Defines the angle change rate as a rate in degrees per second
+            robotAngleChangeRate = inertial_1.gyro_rate(AxisType.ZAXIS, VelocityUnits.DPS)
+
+            #Raw straight line target angle to point
+            targetAngle = calculateTargetAngle(targX,targY,directionBool)
+
+            targetAngle = moveAngleWithinRange(robotAngle,targetAngle)
+
+            #Speeds in percentages
+            leftSpeedRaw = pTurningComponent*(targetAngle-robotAngle) #Proportional component
+            leftSpeedRaw -= pTurningComponent*dTurningComponent*robotAngleChangeRate  #Derivative component
+
+            #Makes sure speed is at least 1%
+            if targetAngle-robotAngle > 0:
+                if leftSpeedRaw < 1:
+                    leftSpeedRaw = 1
+            else:
+                if leftSpeedRaw > -1:
+                    leftSpeedRaw = -1
+
+            rightSpeedRaw = -leftSpeedRaw
+
+            linearizedSpeeds = linearize(leftSpeedRaw, rightSpeedRaw)
+            drivetrain(linearizedSpeeds[0], linearizedSpeeds[1])
+            if telemetryCount % 10 == 0:
+                print("speed ", round(linearizedSpeeds[0],1), "left to turn:", round(targetAngle-robotAngle,1), "p component:", round(pTurningComponent*(targetAngle-robotAngle),1), "d component:", round(-pTurningComponent*dTurningComponent*robotAngleChangeRate,1))
+
+            if robotAngle <= targetAngle+turnExitWindow and robotAngle >= targetAngle-turnExitWindow:
+                print("Done Turning Time elapsed: ", brain.timer.time(MSEC)-timeStart)
+                break
+
+            wait(loopPeriod, MSEC)
+                
+            telemetryCount += 1
+    drivetrain(0,0)
+
+    
+    #Second PID loop to drive the robot along the arc onto the point, holding the heading with the
+    #same turning PD so the path stays curved.
+    #Condition checked at the end
+
+    wait(100, MSEC) #Short settle so the gyro rate reads zero before anything starts steering off it.
+    settleCounter = 0
+    moveStartTime = brain.timer.time(MSEC)
+
+    lastMoveSpeed = 0
+    while stopCondition == False:
+
+        #Defines the angle as a heading in degrees
+        robotAngle = inertial_1.heading(DEGREES)
+        #Defines the angle change rate as a rate in degrees per second
+        robotAngleChangeRate = inertial_1.gyro_rate(AxisType.ZAXIS, VelocityUnits.DPS)
+
+        #Straight line distance left to cover
+        linearDistance = m.sqrt(pow(targX-x,2)+pow(targY-y,2))
+
+        #Raw straight line target angle to point
+        targetAngle = calculateTargetAngle(targX,targY,directionBool)
+
+        if linearDistance > headingLockRadius:
+            
+           targetAngle = moveAngleWithinRange(robotAngle,targetAngle)
+           previousTargetAngle = targetAngle
+
+        else:
+            targetAngle = moveAngleWithinRange(robotAngle, previousTargetAngle)
+        
+        if directionBool == False:
+            linearDistance = -linearDistance
+
+        distanceLeft = linearDistance
+
+        #Straight moves return (1,1).  important: fix this bug later! ??
+
+        turnSpeed = pDriveTurningComponent*(targetAngle-robotAngle) #Proportional component turning
+        turnSpeed -= pDriveTurningComponent*dDriveTurningComponent*robotAngleChangeRate  #Derivative component turning
+
+        moveSpeed = pMoveComponent*linearDistance #Proportional component moving
+
+        moveSpeed -= dMoveComponent*velocityForward  #Derivative component moving
+        """
+        if previousArcDistance != None:
+            #arc distance is just the dintance to target but accounting for the curved path.
+            moveSpeed += pMoveComponent*dMoveComponent*(arcDistance-previousArcDistance)/(loopPeriod/1000)  #Derivative component moving
+        previousArcDistance = arcDistance
+        """
+
+        turnSpeed = max(-100, min(100, turnSpeed))
+        #moveHeadroom = 100-abs(turnSpeed) Maybe unneeded?
+        #moveSpeed = max(-moveHeadroom, min(moveHeadroom, moveSpeed))
+
+        if moveSpeed > lastMoveSpeed+2:
+            moveSpeed = lastMoveSpeed+2
+        lastMoveSpeed = moveSpeed
+
+        leftSpeedRaw = moveSpeed+turnSpeed
+        rightSpeedRaw = moveSpeed-turnSpeed
+
+        linearizedSpeeds = linearize(leftSpeedRaw, rightSpeedRaw)
+
+        drivetrain(linearizedSpeeds[0], linearizedSpeeds[1])
+
+        if telemetryCount % 10 == 0:
+            print("MTD: ", round(targetAngle,1), " reading: ", round(robotAngle,1), " dist: ", round(linearDistance,2), " speeds: ", round(linearizedSpeeds[0],1), round(linearizedSpeeds[1],1))
+
+        #Checks to make sure robot is within the exit windows
+        if abs(linearDistance) <= moveExitWindow:
+            settleCounter += 1
+        else:
+            settleCounter = 0
+
+        #small settle
+        if settleCounter >= moveSettleCount:
+            print("Done Moving")
+            break
+
+        #DOESNT WORK FOR REVERS
+        if linearDistance <= headingLockRadius and abs(targetAngle - previousTargetAngle) > 120:
+            print("OVERSHOOT")
+            break
+
+        if brain.timer.time(MSEC)-moveStartTime > moveTimeout:
+            print("Move timed out")
+            break
+
+        wait(loopPeriod, MSEC)
+        telemetryCount += 1
+
+    print(str(x) + ", " + str(y) + ", d:" + str(linearDistance) + ", t:" + str(brain.timer.time(MSEC) - moveStartTime))
+    drivetrain(0,0)
+    stopCondition = True
+    wait(200, MSEC)
+    stopCondition = False
+    
 
 """
 Elevates the lift by spinning elevation motors to a centian angle.
@@ -511,7 +724,7 @@ def elevationTo(angle):
     elevationL.spin_to_position(angle, DEGREES, 100, PERCENT, False)
     elevationR.spin_to_position(angle, DEGREES, 100, PERCENT, False)
 
-mode = 2 #0 = comp mode #1 = calibrating pos #2 = testing pos
+mode = 2 #0 = comp mode #1 = calibrating pos #2 = testing path mode
 
 def pre_autonomous():
     global mode
@@ -568,7 +781,6 @@ def autonomous():
     global velocityForward
     global stopCondition
     global distanceLeft
-    global finishedMove
 
     brain.screen.clear_screen()
     brain.screen.print("autonomous code")
@@ -586,15 +798,10 @@ def autonomous():
     threadPosition = Thread(position, (0, 0, 2.0))
 
     if mode != 1:
-        moveToDW(10,10,90, "forward")
-        distanceLeft = 10
-        while((velocityForward > 0 or distanceLeft > 4) and not finishedMove):
-            wait(20, MSEC)
-        stopCondition = True
-        while(stopCondition == True and not finishedMove):
-            wait(20, MSEC)
-        finishedMove = False
-        
+
+        #test moveToLin
+        moveToLin(20,0,"forward")
+
         """
         drivetrain(-20,60)
         wait(80, MSEC)
@@ -608,9 +815,17 @@ def autonomous():
         wait(100, MSEC)
         drivetrain(0,0)
 
-        elevationTo(1200)
-        moveTo(-15.6,11.6,-85, "forward", True)
-        elevationTo(600)
+        elevationTo(1000)
+        moveToDW(-19,10,-80, "forward", 0.8, True)
+        #Variable stop condition
+        distanceLeft = 10
+        while((velocityForward > 0.1 or distanceLeft > 4) and not stopCondition):
+            wait(20, MSEC)
+
+        print("Done moving to point")
+        stopCondition = True
+
+        elevationTo(470)
         wait(500, MSEC)
         digital_out_a.set(True)
         wait(200, MSEC)
@@ -619,12 +834,20 @@ def autonomous():
         wait(250, MSEC)
         drivetrain(0,0)
         wait(200, MSEC)
-        moveTo(19.1,-5.2, 150, "forward")
+        moveTo(17.5,-4.5, 140, "forward", 0.8)
         digital_out_a.set(False)
         wait(200, MSEC)
-        elevationTo(2600)
-        moveTo(20,2.7,20, "forward")
-        elevationTo(1500)
+        elevationTo(2000)
+        moveToDW(18.5,5,20, "forward")
+
+        distanceLeft = 10
+        while((velocityForward > 0.1 or distanceLeft > 4) and not stopCondition):
+            wait(20, MSEC)
+
+        print("Done moving to point")
+        stopCondition = True
+
+        elevationTo(1000)
         wait(500, MSEC)
         digital_out_a.set(True)
         drivetrain(-100,-100)
