@@ -541,28 +541,28 @@ def moveToLin(targX, targY, direction, moveSpeedMult = 1.0, dontTurn = False):
 
     
     #P and D components for PID loop tunring
-    pTurningComponent = 0.5
+    pTurningComponent = 0.7
 
-    dTurningComponent = 0.05 #Dont know why this is so low but it works
+    dTurningComponent = 0.1 #Dont know why this is so low but it works
 
     #P and D components for DRIVING loop tunring
-    pDriveTurningComponent = 0.5
+    pDriveTurningComponent = 0.8
 
-    dDriveTurningComponent = 0
+    dDriveTurningComponent = 0.16
 
     #How close to MTD (in degrees) counts as done. Recomended to stay wider than inverse of p component.
-    turnExitWindow = 1.5
+    turnExitWindow = 1
 
     #P and D components for PID loop moving forward
-    pMoveComponent = 2.5*moveSpeedMult
-    dMoveComponent = 0.1*moveSpeedMult
+    pMoveComponent = 3.5*moveSpeedMult
+    dMoveComponent = 0.08*moveSpeedMult
 
     #Must stay wider than deadzone/pMoveComponent
     moveExitWindow = 0.3
     moveSettleCount = 3
 
     #Inside this radius (inches) stop re-aiming at the point and just holds current angle.
-    headingLockRadius = 1
+    headingLockRadius = 0.5
 
     #timeout
     moveTimeout = 5000 #msec
@@ -696,7 +696,7 @@ def moveToLin(targX, targY, direction, moveSpeedMult = 1.0, dontTurn = False):
             print("Done Moving")
             break
 
-        #DOESNT WORK FOR REVERS
+        #DOESNT WORK FOR REVERSE
         if linearDistance <= headingLockRadius and abs(targetAngle - previousTargetAngle) > 120:
             print("OVERSHOOT")
             break
@@ -798,11 +798,13 @@ def autonomous():
     threadPosition = Thread(position, (0, 0, 2.0))
 
     if mode != 1:
-
+        """
         #test moveToLin
         moveToLin(20,0,"forward")
-
+        moveToLin(-20,0,"forward")
         """
+
+        
         drivetrain(-20,60)
         wait(80, MSEC)
         drivetrain(-80,-40)
@@ -816,7 +818,7 @@ def autonomous():
         drivetrain(0,0)
 
         elevationTo(1000)
-        moveToDW(-19,10,-80, "forward", 0.8, True)
+        moveToLinDW(-19,10.5, "forward", 0.8)
         #Variable stop condition
         distanceLeft = 10
         while((velocityForward > 0.1 or distanceLeft > 4) and not stopCondition):
@@ -834,11 +836,14 @@ def autonomous():
         wait(250, MSEC)
         drivetrain(0,0)
         wait(200, MSEC)
-        moveTo(17.5,-4.5, 140, "forward", 0.8)
+        """
+        #moveToLin(8,12, "forward", 1)
+        #moveToLin(15,5, "forward", 0.9)
+        moveTo(15,5, "forward", 0.7)
         digital_out_a.set(False)
         wait(200, MSEC)
         elevationTo(2000)
-        moveToDW(18.5,5,20, "forward")
+        moveToLinDW(18.5,5, "forward")
 
         distanceLeft = 10
         while((velocityForward > 0.1 or distanceLeft > 4) and not stopCondition):
@@ -853,7 +858,7 @@ def autonomous():
         drivetrain(-100,-100)
         wait(100, MSEC)
         drivetrain(0,0)
-        """
+    """
         
     if mode == 1:
             
