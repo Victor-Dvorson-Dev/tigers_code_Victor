@@ -103,8 +103,7 @@ def position(startingX, startingY, trackingwheelDiamiter):
     y = startingY
 
     previousTrackingAngle = 0
-    #set_position resets what .position() reports, NOT what .angle() reports, so this only lines up
-    #with previousTrackingAngle = 0 because the loop below reads .position().
+    
     trackingWheelVertL.set_position(0, DEGREES)
 
     #The time between velocity measurments, must wait for tracking wheel to update.
@@ -546,9 +545,9 @@ def moveToLin(targX, targY, direction, moveSpeedMult = 1.0, dontTurn = False):
     dTurningComponent = 0.1 #Dont know why this is so low but it works
 
     #P and D components for DRIVING loop tunring
-    pDriveTurningComponent = 0.8
+    pDriveTurningComponent = 0.75
 
-    dDriveTurningComponent = 0.16
+    dDriveTurningComponent = 0.14
 
     #How close to MTD (in degrees) counts as done. Recomended to stay wider than inverse of p component.
     turnExitWindow = 1
@@ -697,7 +696,7 @@ def moveToLin(targX, targY, direction, moveSpeedMult = 1.0, dontTurn = False):
             break
 
         #DOESNT WORK FOR REVERSE
-        if linearDistance <= headingLockRadius and abs(targetAngle - previousTargetAngle) > 120:
+        if abs(linearDistance) <= headingLockRadius and abs(targetAngle - previousTargetAngle) > 120:
             print("OVERSHOOT")
             break
 
@@ -713,7 +712,43 @@ def moveToLin(targX, targY, direction, moveSpeedMult = 1.0, dontTurn = False):
     stopCondition = True
     wait(200, MSEC)
     stopCondition = False
-    
+
+
+def move(dist,moveSpeedMult,trackingwheelDiamiter):
+    """
+    Moves the robot a certain distance in inches.
+    """
+
+    #P and D components for PID loop moving forward
+    pMoveComponent = 3.8*moveSpeedMult
+    dMoveComponent = 0.08*moveSpeedMult
+
+    previousTrackingAngle = trackingWheelVertL.position(DEGREES)
+    while True:
+
+        currentTrackingAngle = trackingWheelVertL.position(DEGREES)
+        deltaTrackingAngle = currentTrackingAngle-previousTrackingAngle
+        
+
+        trackDist = -deltaTrackingAngle/360*trackingwheelDiamiter*m.pi
+
+        remainingDist = dist-trackDist
+
+        moveSpeed = pMoveComponent*remainingDist #Proportional component moving
+
+        moveSpeed -= dMoveComponent*velocityForward  #Derivative component moving
+
+        
+
+        linearizedSpeeds = linearize(moveSpeed, moveSpeed)
+
+        drivetrain(linearizedSpeeds[0], linearizedSpeeds[1])
+
+        if (abs(remainingDist) < 0.2 and abs(velocityForward) < 0.5):
+            break
+
+        wait(20, MSEC)
+    drivetrain(0,0)
 
 """
 Elevates the lift by spinning elevation motors to a centian angle.
@@ -816,12 +851,13 @@ def autonomous():
         drivetrain(80,80)
         wait(100, MSEC)
         drivetrain(0,0)
+        
 
         elevationTo(1000)
-        moveToLinDW(-19,10.5, "forward", 0.8)
+        moveToLinDW(-19.2,10.3, "forward", 0.8)
         #Variable stop condition
         distanceLeft = 10
-        while((velocityForward > 0.1 or distanceLeft > 4) and not stopCondition):
+        while((velocityForward > 0.2 or distanceLeft > 4) and not stopCondition):
             wait(20, MSEC)
 
         print("Done moving to point")
@@ -831,11 +867,50 @@ def autonomous():
         wait(500, MSEC)
         digital_out_a.set(True)
         wait(200, MSEC)
+        move(-5,1,2.0)
+        elevationTo(200)
+
+        moveToDW(-22.2,-3.5,-145, "forward", 0.7)
+        #Variable stop condition
+        distanceLeft = 10
+        while((velocityForward > 0.2 or distanceLeft > 4) and not stopCondition):
+            wait(20, MSEC)
+
+        print("Done moving to point")
+        stopCondition = True
+
+        drivetrain(0,100)
+        wait(300, MSEC)
+        drivetrain(0,0)
+        digital_out_a.set(False)
+        wait(100, MSEC)
+        drivetrain(0,100)
+        wait(700, MSEC)
+        drivetrain(0,0)
+
+        elevationTo(1500)
+        wait(100, MSEC)
+        moveToLinDW(-20.5,5, "forward", 0.8)
+
+        #Variable stop condition
+        distanceLeft = 10
+        while((velocityForward > 0.2 or distanceLeft > 4) and not stopCondition):
+            wait(20, MSEC)
+
+        print("Done moving to point")
+        stopCondition = True
+
+        elevationTo(800)
+        wait(100, MSEC)
+        digital_out_a.set(True)
+
+        """
         drivetrain(-100,-100)
         elevationTo(270)
         wait(250, MSEC)
         drivetrain(0,0)
         wait(200, MSEC)
+        """
         """
         #moveToLin(8,12, "forward", 1)
         #moveToLin(15,5, "forward", 0.9)
