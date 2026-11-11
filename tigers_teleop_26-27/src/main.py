@@ -436,7 +436,7 @@ def VelocityVectors(trackingwheelDiamiter):
 def autoGrab():
     global velocityForward
     #Macro to grab the cone
-    toggle = False
+    toggle = True
 
     while (True):
 
@@ -447,17 +447,24 @@ def autoGrab():
                 wait(20, MSEC)
             while(controller_1.buttonB.pressing() == False):
                 wait(20, MSEC)
+                
+            while controller_1.buttonB.pressing():
+                wait(20, MSEC)
 
-        
-        shouldGrab = distance_claw.object_distance(INCHES) < 2.7 + 0.4*velocityForward
-        if  shouldGrab and elevationL.position(DEGREES) < 450 and toggle == False and digital_out_a.value() == True:
+        if velocityForward < 20:
+            shouldGrab = distance_claw.object_distance(INCHES) < 2.7 + 0.37*velocityForward
+        else:
+            shouldGrab = distance_claw.object_distance(INCHES) < 2.7 + 0.37*20
+
+        if  shouldGrab and elevationL.position(DEGREES) < 200 and toggle == False and digital_out_a.value() == True:
             digital_out_a.set(False)
             wait(velocityForward*5+30, MSEC)
             MacroClawUpLoop()
             print("Auto grab complete")
             toggle = True
-        elif (not shouldGrab and digital_out_a.value() == False):
+        elif (distance_claw.object_distance(INCHES) > 5 and digital_out_a.value() == True):
             toggle = False
+            
 
         wait(20, MSEC)
 
