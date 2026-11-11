@@ -23,7 +23,9 @@ digital_out_a = DigitalOut(brain.three_wire_port.a)
 digital_out_b = DigitalOut(brain.three_wire_port.b)
 inertial_21 = Inertial(Ports.PORT7)
 
-distance_claw = Distance(Ports.PORT12)
+distance_claw = Distance(Ports.PORT13)
+
+trackingWheelVertL= Rotation(Ports.PORT11, True)
 
 
 # wait for rotation sensor to fully initialize
@@ -68,6 +70,7 @@ from vex import *
 # Begin project code
 
 #VARIABLES
+velocityForward = 0 #forward velocity of the robot in inches per second
 
 #The drivetrain will turn at this % velocity until changed by pressing x
 startingTurnVelocity = 40 #default is 
@@ -135,6 +138,8 @@ def driveFunction():     #Threaded function to drive motors based on controller 
     while (True):
         #print("\033[2J") #Clears console
         #tipPrevention()
+
+        
 
 
         #Changes the curve to more linear or more exponential
@@ -225,8 +230,10 @@ def driveFunction():     #Threaded function to drive motors based on controller 
         #for telemetry
         if (telemLoop  >= 10): 
 
-            print("|" + str(round(leftV)) + "|-|" + str(round(rightV)) + "|   " + str(controller_1.axis1.position()) + "|" + str(controller_1.axis3.position()) + "   "  +  "   Turn velocity:" + str(turnVelocity))
+            print("|" + str(round(leftV)) + "|-|" + str(round(rightV)) + "|   " + str(controller_1.axis1.position()) + "|" + str(controller_1.axis3.position()) + "   "  +  "   Turn velocity:" + str(turnVelocity) + "   Forward velocity:" + str(round(forwardV)))
 
+            #Send temparature of the warmest motor to the controller screen
+            CIO()
 
             #resets telemetry loop
             telemLoop = 0
@@ -390,16 +397,50 @@ def MacroClawUpLoop():
     elevationR.spin(FORWARD)
     elevationL.set_velocity(100, PERCENT)
     elevationR.set_velocity(100, PERCENT)
-    while (elevationL.position(DEGREES) < 290):
+    while (elevationL.position(DEGREES) < 480):
         wait(20, MSEC)
     elevationL.stop()
     elevationR.stop()
+
+def VelocityVectors(trackingwheelDiamiter):
+    global velocityForward
+
+    previousTrackingAngle = 0
     
+    trackingWheelVertL.set_position(0, DEGREES)
+
+    #The time between velocity measurments, must wait for tracking wheel to update.
+    lastVelocityGetTime = brain.timer.time(MSEC) - 20
+    velocityForwardArr = [0,0,0,0]
+
+    while(True):
+
+        currentTrackingAngle = trackingWheelVertL.position(DEGREES)
+        deltaTrackingAngle = currentTrackingAngle-previousTrackingAngle
+        previousTrackingAngle = currentTrackingAngle
+
+        trackDist = -deltaTrackingAngle/360*trackingwheelDiamiter*math.pi
+
+        #Velocity averaged over >60 msec
+        #Array of speeds with 3 elements, later averaged to make forwardSpeed.
+        for i in range(len(velocityForwardArr)-1,1,-1):
+            velocityForwardArr[i] = velocityForwardArr[i-1]
+        velocityForwardArr[0] = trackDist/((brain.timer.time(MSEC)-lastVelocityGetTime)/1000)
+        lastVelocityGetTime = brain.timer.time(MSEC)
+
+        #take the average of the array
+        velocityForward = sum(velocityForwardArr)/(len(velocityForwardArr))
+
+        wait(20, MSEC)
+
 def autoGrab():
+    global velocityForward
     #Macro to grab the cone
     toggle = False
 
     while (True):
+
+        print(velocityForward)
         if controller_1.buttonB.pressing():
             print("Auto grab paused")
             while controller_1.buttonB.pressing():
@@ -407,13 +448,15 @@ def autoGrab():
             while(controller_1.buttonB.pressing() == False):
                 wait(20, MSEC)
 
-        if distance_claw.object_distance(INCHES) < 4 and elevationL.position(DEGREES) < 280 and toggle == False:
+        
+        shouldGrab = distance_claw.object_distance(INCHES) < 2.7 + 0.4*velocityForward
+        if  shouldGrab and elevationL.position(DEGREES) < 450 and toggle == False and digital_out_a.value() == True:
             digital_out_a.set(False)
-            wait(250, MSEC)
+            wait(velocityForward*5+30, MSEC)
             MacroClawUpLoop()
             print("Auto grab complete")
             toggle = True
-        elif (toggle):
+        elif (not shouldGrab and digital_out_a.value() == False):
             toggle = False
 
         wait(20, MSEC)
@@ -421,6 +464,8 @@ def autoGrab():
 def CIO():
 
     #prints the temeprature of the warmest motor
+    controller_1.screen.clear_row(1)
+    controller_1.screen.set_cursor(1, 1)
     controller_1.screen.print(max(motorFL.temperature(PERCENT),motorFR.temperature(PERCENT),motorML.temperature(PERCENT),motorMR.temperature(PERCENT),motorBL.temperature(PERCENT),motorBR.temperature(PERCENT)))
 
 
@@ -446,17 +491,14 @@ def user_control():
     driveThread = Thread(driveFunction)
     elevationAndClawThread = Thread(elevationAndClaw)
     macroClawUpThread = Thread(MacroClawUp)
-    #autoGrabThread = Thread(autoGrab)
+    velocityVectorsThread = Thread(VelocityVectors, (2.75,)) 
+    autoGrabThread = Thread(autoGrab)
     
 
     while True:
-        wait(20, MSEC)
+        wait(1000, MSEC)
         
 
 # create competition instance
 comp = Competition(user_control, autonomous)
 pre_autonomous()
-
-
-
-
