@@ -11,19 +11,21 @@ controller_1 = Controller(PRIMARY)
 
 motorFL = Motor(Ports.PORT10, GearSetting.RATIO_6_1, True)   # front-left
 motorFR = Motor(Ports.PORT1, GearSetting.RATIO_6_1, False)  # front-right
-motorBL = Motor(Ports.PORT9, GearSetting.RATIO_6_1, True)   # back-left
+motorBL = Motor(Ports.PORT8, GearSetting.RATIO_6_1, True)   # back-left
 motorBR = Motor(Ports.PORT3,  GearSetting.RATIO_6_1, False)  # back-right
-motorML = Motor(Ports.PORT8, GearSetting.RATIO_6_1, True)   # mid-left
+motorML = Motor(Ports.PORT9, GearSetting.RATIO_6_1, True)   # mid-left
 motorMR = Motor(Ports.PORT2,  GearSetting.RATIO_6_1, False)  # mid-right
 
-elevationL = Motor(Ports.PORT5, GearSetting.RATIO_6_1, True)
-elevationR = Motor(Ports.PORT6, GearSetting.RATIO_6_1, False)
-
-rotationMotor = Motor(Ports.PORT11,  GearSetting.RATIO_6_1, False) 
+elevationL = Motor(Ports.PORT4, GearSetting.RATIO_6_1, False)
+elevationR = Motor(Ports.PORT6, GearSetting.RATIO_6_1, True)
 
 digital_out_a = DigitalOut(brain.three_wire_port.a)
 digital_out_b = DigitalOut(brain.three_wire_port.b)
 inertial_21 = Inertial(Ports.PORT7)
+
+distance_claw = Distance(Ports.PORT13)
+
+trackingWheelVertL= Rotation(Ports.PORT11, True)
 
 
 # wait for rotation sensor to fully initialize
@@ -68,10 +70,11 @@ from vex import *
 # Begin project code
 
 #VARIABLES
+velocityForward = 0 #forward velocity of the robot in inches per second
 
 #The drivetrain will turn at this % velocity until changed by pressing x
-startingTurnVelocity = 30 #default is 20
-otherTurnVelocity = 35
+startingTurnVelocity = 40 #default is 
+otherTurnVelocity = 50
 
 a = 38 #quadratic
 b = 60 #linear
@@ -135,6 +138,8 @@ def driveFunction():     #Threaded function to drive motors based on controller 
     while (True):
         #print("\033[2J") #Clears console
         #tipPrevention()
+
+        
 
 
         #Changes the curve to more linear or more exponential
@@ -225,8 +230,10 @@ def driveFunction():     #Threaded function to drive motors based on controller 
         #for telemetry
         if (telemLoop  >= 10): 
 
-            print("|" + str(round(leftV)) + "|-|" + str(round(rightV)) + "|   " + str(controller_1.axis1.position()) + "|" + str(controller_1.axis3.position()) + "   "  +  "   Turn velocity:" + str(turnVelocity))
+            print("|" + str(round(leftV)) + "|-|" + str(round(rightV)) + "|   " + str(controller_1.axis1.position()) + "|" + str(controller_1.axis3.position()) + "   "  +  "   Turn velocity:" + str(turnVelocity) + "   Forward velocity:" + str(round(forwardV)))
 
+            #Send temparature of the warmest motor to the controller screen
+            CIO()
 
             #resets telemetry loop
             telemLoop = 0
@@ -274,82 +281,48 @@ def setTorque(leftT,rightT):
     motorBR.set_max_torque(rightT, PERCENT)
 
 
-#Include claw position defenition somewhere in code if using this function!
-clawPosition = 0 #0 = starting position, 1 = flipped position
+
 def elevationAndClaw():
     global clawPosition
-    rotationMotor.set_stopping(HOLD)
 
     clawToggle = False
-    flipToggle = False
 
     position = 0
-    elevationL.set_position(0, DEGREES)
-    elevationR.set_position(0, DEGREES)
 
     elevationL.set_stopping(HOLD)
     elevationR.set_stopping(HOLD)
 
     stop = False
+
+    disableClawLimit = True
     
     while True:
 
         #Elevation control
         prevTime = brain.timer.time(MSEC)
 
+        if (controller_1.buttonUp.pressing()):
+            disableClawLimit = True
+
         if (controller_1.buttonR1.pressing()):
             elevationL.spin(FORWARD)
             elevationR.spin(FORWARD)
-            elevationL.set_velocity(95, PERCENT)
-            elevationR.set_velocity(85, PERCENT)
+            elevationL.set_velocity(100, PERCENT)
+            elevationR.set_velocity(100, PERCENT)
             print(elevationL.position(DEGREES))
             stop = False
 
         elif (controller_1.buttonR2.pressing()):
             elevationL.spin(FORWARD)
             elevationR.spin(FORWARD)
-            elevationL.set_velocity(-65, PERCENT)
-            elevationR.set_velocity(-65, PERCENT)
+            elevationL.set_velocity(-75, PERCENT)
+            elevationR.set_velocity(-75, PERCENT)
             stop = False
 
         elif stop == False:
             elevationL.stop()
             elevationR.stop()
             stop = True
-
-        #Claw rotation control
-        if (controller_1.buttonUp.pressing()):
-            rotationMotor.spin(FORWARD)
-            rotationMotor.set_velocity(25, PERCENT)
-        elif (controller_1.buttonDown.pressing()):
-            rotationMotor.spin(FORWARD)
-            rotationMotor.set_velocity(-18, PERCENT)
-        else:
-            rotationMotor.stop()
-
-        #Claw flipper
-        """
-        flips the claw if r2 pressed.
-        You can access the position of the claw by using the global variable clawPosition. 0 = starting position, 1 = flipped position
-        """
-        if controller_1.buttonL2.pressing():
-            if flipToggle == False:
-                if digital_out_b.value() == False:
-                    digital_out_b.set(True)
-                    clawPosition = 1
-                else:
-                    digital_out_b.set(False)
-                    clawPosition = 0
-
-                flipToggle = True
-
-                #so kawaii :3 <3
-                brain.screen.clear_line(1)
-                brain.screen.set_cursor(1, 1)
-                brain.screen.print("so kawaii :3 <3 "+str(clawPosition))
-
-        elif (flipToggle == True):
-            flipToggle = False
 
         #claw 
         if controller_1.buttonL1.pressing():
@@ -410,28 +383,96 @@ def MacroClawUp():
     #Macro to move the claw up to the top position
     toggle = False
     while (True):
-        if controller_1.buttonLeft.pressing() and toggle == False:
-            print("Macro claw up")
-            elevationL.spin(FORWARD)
-            elevationR.spin(FORWARD)
-            elevationL.set_velocity(100, PERCENT)
-            elevationR.set_velocity(90, PERCENT)
-
-            while (elevationL.position(DEGREES) < 320):
-                wait(20, MSEC)
-
-            elevationL.stop()
-            elevationR.stop()
+        if controller_1.buttonL2.pressing() and toggle == False:
+            MacroClawUpLoop()
             toggle = True
-        elif (controller_1.buttonLeft.pressing() == False and toggle == True):
+        elif (controller_1.buttonL2.pressing() == False and toggle == True):
             toggle = False
 
         wait(20, MSEC)
+
+def MacroClawUpLoop():
+    print("Macro claw up")
+    elevationL.spin(FORWARD)
+    elevationR.spin(FORWARD)
+    elevationL.set_velocity(100, PERCENT)
+    elevationR.set_velocity(100, PERCENT)
+    while (elevationL.position(DEGREES) < 480):
+        wait(20, MSEC)
+    elevationL.stop()
+    elevationR.stop()
+
+def VelocityVectors(trackingwheelDiamiter):
+    global velocityForward
+
+    previousTrackingAngle = 0
     
+    trackingWheelVertL.set_position(0, DEGREES)
+
+    #The time between velocity measurments, must wait for tracking wheel to update.
+    lastVelocityGetTime = brain.timer.time(MSEC) - 20
+    velocityForwardArr = [0,0,0,0]
+
+    while(True):
+
+        currentTrackingAngle = trackingWheelVertL.position(DEGREES)
+        deltaTrackingAngle = currentTrackingAngle-previousTrackingAngle
+        previousTrackingAngle = currentTrackingAngle
+
+        trackDist = -deltaTrackingAngle/360*trackingwheelDiamiter*math.pi
+
+        #Velocity averaged over >60 msec
+        #Array of speeds with 3 elements, later averaged to make forwardSpeed.
+        for i in range(len(velocityForwardArr)-1,1,-1):
+            velocityForwardArr[i] = velocityForwardArr[i-1]
+        velocityForwardArr[0] = trackDist/((brain.timer.time(MSEC)-lastVelocityGetTime)/1000)
+        lastVelocityGetTime = brain.timer.time(MSEC)
+
+        #take the average of the array
+        velocityForward = sum(velocityForwardArr)/(len(velocityForwardArr))
+
+        wait(20, MSEC)
+
+def autoGrab():
+    global velocityForward
+    #Macro to grab the cone
+    toggle = True
+
+    while (True):
+
+        print(velocityForward)
+        if controller_1.buttonB.pressing():
+            print("Auto grab paused")
+            while controller_1.buttonB.pressing():
+                wait(20, MSEC)
+            while(controller_1.buttonB.pressing() == False):
+                wait(20, MSEC)
+                
+            while controller_1.buttonB.pressing():
+                wait(20, MSEC)
+
+        if velocityForward < 20:
+            shouldGrab = distance_claw.object_distance(INCHES) < 2.7 + 0.37*velocityForward
+        else:
+            shouldGrab = distance_claw.object_distance(INCHES) < 2.7 + 0.37*20
+
+        if  shouldGrab and elevationL.position(DEGREES) < 200 and toggle == False and digital_out_a.value() == True:
+            digital_out_a.set(False)
+            wait(velocityForward*5+30, MSEC)
+            MacroClawUpLoop()
+            print("Auto grab complete")
+            toggle = True
+        elif (distance_claw.object_distance(INCHES) > 5 and digital_out_a.value() == True):
+            toggle = False
+            
+
+        wait(20, MSEC)
 
 def CIO():
 
     #prints the temeprature of the warmest motor
+    controller_1.screen.clear_row(1)
+    controller_1.screen.set_cursor(1, 1)
     controller_1.screen.print(max(motorFL.temperature(PERCENT),motorFR.temperature(PERCENT),motorML.temperature(PERCENT),motorMR.temperature(PERCENT),motorBL.temperature(PERCENT),motorBR.temperature(PERCENT)))
 
 
@@ -441,7 +482,8 @@ def pre_autonomous():
     brain.screen.clear_screen()
     brain.screen.print("pre auton code")
     wait(1, SECONDS)
-    elevationL.set_position(0, DEGREES)
+    #elevationL.set_position(0, DEGREES)
+    #elevationR.set_position(0, DEGREES)
 
 
 def autonomous():
@@ -456,17 +498,14 @@ def user_control():
     driveThread = Thread(driveFunction)
     elevationAndClawThread = Thread(elevationAndClaw)
     macroClawUpThread = Thread(MacroClawUp)
-    #armThread = Thread(arm_descore)
-    #intakeThread = Thread(intake)
+    velocityVectorsThread = Thread(VelocityVectors, (2.75,)) 
+    autoGrabThread = Thread(autoGrab)
+    
 
     while True:
-        wait(20, MSEC)
+        wait(1000, MSEC)
         
 
 # create competition instance
 comp = Competition(user_control, autonomous)
 pre_autonomous()
-
-
-
-
