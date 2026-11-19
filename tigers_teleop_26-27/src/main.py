@@ -27,6 +27,8 @@ distance_claw = Distance(Ports.PORT13)
 
 trackingWheelVertL= Rotation(Ports.PORT11, True)
 
+limit_switch = Limit(brain.three_wire_port.h)
+
 
 # wait for rotation sensor to fully initialize
 wait(30, MSEC)
@@ -302,7 +304,7 @@ def elevationAndClaw():
         prevTime = brain.timer.time(MSEC)
 
         if (controller_1.buttonUp.pressing()):
-            disableClawLimit = True
+            elevationL.set_position(5000,DEGREES)
 
         if (controller_1.buttonR1.pressing()):
             elevationL.spin(FORWARD)
@@ -312,7 +314,7 @@ def elevationAndClaw():
             print(elevationL.position(DEGREES))
             stop = False
 
-        elif (controller_1.buttonR2.pressing()):
+        elif (controller_1.buttonR2.pressing() and (not limit_switch.value() and elevationL.position(DEGREES) >= 0)):
             elevationL.spin(FORWARD)
             elevationR.spin(FORWARD)
             elevationL.set_velocity(-75, PERCENT)
@@ -323,6 +325,10 @@ def elevationAndClaw():
             elevationL.stop()
             elevationR.stop()
             stop = True
+
+        if (limit_switch.value() and (controller_1.buttonR2.pressing() or controller_1.buttonR1.pressing())):
+                elevationL.set_position(0, DEGREES)
+                elevationR.set_position(0, DEGREES)
 
         #claw 
         if controller_1.buttonL1.pressing():
@@ -380,24 +386,51 @@ def tipPrevention():
 threaded function
 """
 def MacroClawUp():
-    #Macro to move the claw up to the top position
+    heightState = 0 # 1 is score with one pin in the goal
+    height = 240
+
     toggle = False
     while (True):
         if controller_1.buttonL2.pressing() and toggle == False:
-            MacroClawUpLoop()
+            try:
+                MacroClawUpThread.stop
+            except:
+                pass
+            MacroClawUpThread = Thread(MacroClawUpLoop, (height,))
             toggle = True
+
+            heightState += 1
+
+            if heightState > 1:
+                height = 240 + 700*(heightState-1) + 500
+            else:
+                height = 240 + 500*heightState
+
+
+
         elif (controller_1.buttonL2.pressing() == False and toggle == True):
             toggle = False
 
+
+        if digital_out_a.value() and heightState > 0:
+
+            heightState = 0
+            height = 240
+
+
         wait(20, MSEC)
 
-def MacroClawUpLoop():
+
+
+def MacroClawUpLoop(height = 240):
     print("Macro claw up")
     elevationL.spin(FORWARD)
     elevationR.spin(FORWARD)
     elevationL.set_velocity(100, PERCENT)
     elevationR.set_velocity(100, PERCENT)
-    while (elevationL.position(DEGREES) < 480):
+    while (elevationL.position(DEGREES) < height):
+        if controller_1.buttonR2.pressing():
+            break
         wait(20, MSEC)
     elevationL.stop()
     elevationR.stop()
@@ -482,7 +515,7 @@ def pre_autonomous():
     brain.screen.clear_screen()
     brain.screen.print("pre auton code")
     wait(1, SECONDS)
-    #elevationL.set_position(0, DEGREES)
+    elevationL.set_position(5000, DEGREES)
     #elevationR.set_position(0, DEGREES)
 
 
@@ -498,8 +531,8 @@ def user_control():
     driveThread = Thread(driveFunction)
     elevationAndClawThread = Thread(elevationAndClaw)
     macroClawUpThread = Thread(MacroClawUp)
-    velocityVectorsThread = Thread(VelocityVectors, (2.75,)) 
-    autoGrabThread = Thread(autoGrab)
+    #velocityVectorsThread = Thread(VelocityVectors, (2.75,)) 
+    #autoGrabThread = Thread(autoGrab)
     
 
     while True:
