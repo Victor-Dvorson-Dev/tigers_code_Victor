@@ -297,6 +297,10 @@ def elevationAndClaw():
     stop = False
 
     disableClawLimit = True
+
+    brain.timer.reset()
+    holdStartingElevationTime = brain.timer.time(MSEC)
+    countingTime = False
     
     while True:
 
@@ -329,6 +333,17 @@ def elevationAndClaw():
         if (limit_switch.value() and (controller_1.buttonR2.pressing() or controller_1.buttonR1.pressing())):
                 elevationL.set_position(0, DEGREES)
                 elevationR.set_position(0, DEGREES)
+
+        if (not limit_switch.value() and elevationL.position(DEGREES) <= 0):
+                if countingTime == False:
+                    holdStartingElevationTime = brain.timer.time(MSEC)
+                    countingTime = True
+                elif countingTime == True and (brain.timer.time(MSEC) - holdStartingElevationTime) >= 600:
+                    elevationL.set_position(3000, DEGREES)
+                    elevationR.set_position(3000, DEGREES)
+                    countingTime = False
+        else:
+            coutingTime = False
 
         #claw 
         if controller_1.buttonL1.pressing():
